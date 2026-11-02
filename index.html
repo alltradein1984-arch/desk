@@ -2,26 +2,104 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="referrer" content="no-referrer">
-<meta name="theme-color" content="#000000">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' https: data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="theme-color" content="#07090c">
 <title>Desk</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-192.png">
 <style>
-  html,body{margin:0;height:100%;background:#000;color:#eee;font:16px/1.4 -apple-system,system-ui,Segoe UI,Roboto,sans-serif}
-  main{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:.6rem}
-  h1{margin:0;font-weight:600;letter-spacing:.04em}
-  #status{color:#888}
-  #status.ok{color:#3ddc84}
-  #status.err{color:#ff5c5c}
+:root{--bg:#07090c;--card:#11151b;--card2:#171c24;--line:#232a35;--txt:#e9edf2;--mut:#8a94a3;--grn:#2fd27a;--red:#ff5468;--amb:#ffb648;--blu:#5aa9ff}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.4 -apple-system,system-ui,Segoe UI,Roboto,sans-serif;-webkit-tap-highlight-color:transparent}
+body{padding-bottom:calc(68px + env(safe-area-inset-bottom))}
+header{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:.6rem;padding:.7rem 1rem;background:rgba(7,9,12,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+header h1{margin:0;font-size:1.1rem;letter-spacing:.05em}
+header .upd{margin-left:auto;color:var(--mut);font-size:.8rem;text-align:right}
+.badge{font-size:.7rem;font-weight:700;padding:.15rem .5rem;border-radius:99px;letter-spacing:.06em}
+.b-paper{background:#2a2410;color:var(--amb);border:1px solid #5a4614}.b-live{background:#2a1015;color:var(--red);border:1px solid #5a1a24}
+main{max-width:1280px;margin:0 auto;padding:1rem}
+.view{display:none}.view.on{display:block;animation:fade .25s ease}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:1rem;margin-bottom:.9rem}
+.mut{color:var(--mut)}.sm{font-size:.82rem}.grn{color:var(--grn)}.red{color:var(--red)}.amb{color:var(--amb)}
+.big{font-size:2rem;font-weight:700;letter-spacing:-.01em}
+.row{display:flex;align-items:center;gap:.6rem}.sp{flex:1}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
+.kv{background:var(--card2);border-radius:12px;padding:.6rem .7rem}.kv b{display:block;font-size:1.05rem}
+.banner{border-radius:14px;padding:.75rem .9rem;margin-bottom:.7rem;font-weight:600}
+.bn-red{background:#2a0f15;border:1px solid #5c1d29;color:#ffb3bd}.bn-amb{background:#2a200d;border:1px solid #5a4614;color:#ffd59a}
+.bn-grn{background:#0d2219;border:1px solid #1b4a33;color:#9ff0c4}.bn-blu{background:#0e1a2a;border:1px solid #1e3a5c;color:#b5d5ff}
+ul.plain{list-style:none;margin:0;padding:0}ul.plain li{padding:.45rem 0;border-bottom:1px solid var(--line)}ul.plain li:last-child{border:0}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+/* auditor */
+.counters{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;margin-bottom:.8rem}
+.counter{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:.6rem;text-align:center}
+.counter b{display:block;font-size:1.5rem}.counter span{font-size:.75rem;color:var(--mut);text-transform:uppercase;letter-spacing:.06em}
+.coin{display:flex;align-items:center;gap:.8rem}
+.logo{width:54px;height:54px;border-radius:50%;flex:none;background:linear-gradient(135deg,#2b3646,#18202b);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1.1rem;overflow:hidden;border:2px solid var(--line)}
+.logo img{width:100%;height:100%;object-fit:cover}
+.pill{margin-left:auto;font-size:.78rem;font-weight:700;padding:.3rem .7rem;border-radius:99px}
+.p-ok{background:#0f2a1d;color:var(--grn);border:1px solid #1d5a3b}.p-bad{background:#2c1016;color:var(--red);border:1px solid #63202d}
+.checks{margin-top:.8rem}
+.chk{display:flex;align-items:center;gap:.7rem;padding:.62rem .2rem;border-bottom:1px solid var(--line);opacity:0;animation:pop .35s ease forwards}
+.chk:last-child{border:0}
+@keyframes pop{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:none}}
+.ic{width:26px;height:26px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:.9rem}
+.ic-ok{background:#123524;color:var(--grn)}.ic-bad{background:#3a121a;color:var(--red)}.ic-na{background:#222a35;color:var(--mut)}
+.chk .lab{font-weight:600;font-size:.92rem}.chk .val{font-size:.82rem;color:var(--mut)}
+.chk.bad .val{color:#ff9aa7}
+.verdict{border-radius:14px;padding:.85rem 1rem;font-weight:700;margin-top:.8rem}
+.v-ok{background:linear-gradient(90deg,#0f3523,#0d2219);border:1px solid #1d5a3b;color:#b6f5d1}
+.v-bad{background:linear-gradient(90deg,#3a1019,#22090e);border:1px solid #63202d;color:#ffc2ca}
+.nav2{display:flex;align-items:center;gap:.5rem;margin:.6rem 0 0}
+.nav2 button{background:var(--card2);color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:.45rem .8rem;font-size:1rem}
+.dots{flex:1;display:flex;justify-content:center;gap:5px;flex-wrap:wrap}
+.dots i{width:7px;height:7px;border-radius:50%;background:#2c3542}.dots i.on{background:var(--txt)}.dots i.r{box-shadow:inset 0 0 0 2px var(--red)}.dots i.g{box-shadow:inset 0 0 0 2px var(--grn)}
+.btn{display:inline-block;text-decoration:none;font-weight:700;font-size:.85rem;color:#06110b;background:var(--grn);padding:.45rem .8rem;border-radius:10px;white-space:nowrap}
+.btn.ghost{background:transparent;color:var(--txt);border:1px solid var(--line)}
+.stage{font-size:.7rem;font-weight:700;padding:.12rem .45rem;border-radius:6px;text-transform:uppercase;letter-spacing:.05em;background:#222a35;color:var(--mut)}
+.st-held,.st-approved,.st-cleared,.st-candidate{background:#123524;color:var(--grn)}.st-rejected,.st-reject{background:#3a121a;color:var(--red)}.st-wait,.st-scored{background:#2a2410;color:var(--amb)}
+.item{padding:.75rem 0;border-bottom:1px solid var(--line)}.item:last-child{border:0}
+.lg{width:34px;height:34px;font-size:.75rem}
+nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:6;display:flex;background:rgba(10,13,17,.97);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+nav.tabs button{flex:1;background:none;border:0;color:var(--mut);padding:.55rem 0 .6rem;font-size:.72rem;display:flex;flex-direction:column;align-items:center;gap:2px}
+nav.tabs button svg{width:22px;height:22px}
+nav.tabs button.on{color:var(--txt)}
+#lock{display:none;text-align:center;padding:4rem 1rem}
+.split-trades{display:none}
+@media (min-width:960px){
+  body{padding-bottom:0}
+  nav.tabs{position:sticky;top:53px;bottom:auto;justify-content:center;border-top:0;border-bottom:1px solid var(--line);background:var(--bg)}
+  nav.tabs button{flex:none;width:120px;flex-direction:row;justify-content:center;gap:.4rem;font-size:.85rem;padding:.7rem 0}
+  nav.tabs button svg{width:18px;height:18px}
+  .split{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:1rem;align-items:start}
+  .split-trades{display:block}
+  #v-home .homegrid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;align-items:start}
+}
 </style>
 </head>
 <body>
-<main>
-  <h1>Desk</h1>
-  <div id="status">Loading…</div>
+<header>
+  <h1>DESK</h1><span id="mode" class="badge b-paper">…</span>
+  <div class="upd" id="upd">Loading…</div>
+</header>
+<nav class="tabs" id="tabs">
+  <button data-v="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Home</button>
+  <button data-v="audit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg>Auditor</button>
+  <button data-v="coins"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="9" r="6"/><path d="M15.5 9.5a6 6 0 1 1-6 6"/></svg>Coins</button>
+  <button data-v="trades"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>Trades</button>
+  <button data-v="events"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Events</button>
+</nav>
+<div id="lock"><h2>Locked</h2><p class="mut" id="lockmsg">Open your secret desk link (the one ending in #t=…) once on this device.</p></div>
+<main id="app">
+  <section class="view" id="v-home"></section>
+  <section class="view" id="v-audit"><div class="split"><div id="auditPane"></div><div class="split-trades" id="splitTrades"></div></div></section>
+  <section class="view" id="v-coins"></section>
+  <section class="view" id="v-trades"></section>
+  <section class="view" id="v-events"></section>
 </main>
 <script>
 // Token comes from the URL fragment (#t=...), which browsers never send to the server.
@@ -56,26 +134,208 @@ async function decryptEnvelope(env, token) {
   return JSON.parse(new TextDecoder().decode(pt));
 }
 
+// GitHub Pages' CDN caches files for up to 10 min; the ?ts= query makes every fetch a fresh URL.
 async function load(name) {
   const r = await fetch(`data/${name}.enc.json?ts=${Date.now()}`, { cache: "no-store" });
   if (!r.ok) throw new Error(`fetch ${name}: HTTP ${r.status}`);
   return decryptEnvelope(await r.json(), deskToken());
 }
 
-(async () => {
-  const el = document.getElementById("status");
-  if (!deskToken()) { el.textContent = "Locked · open the link with #t=…"; el.className = "err"; return; }
+// ---------- helpers ----------
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const safeUrl = u => (typeof u === "string" && /^https:\/\/[^\s"'<>]+$/.test(u)) ? u : null;
+const usd = (x, sign) => x == null ? "–" : (sign && x > 0 ? "+" : x < 0 ? "-" : "") + "$" + Math.abs(x).toFixed(2);
+const pct = x => x == null ? "–" : (x > 0 ? "+" : "") + x.toFixed(1) + "%";
+const cls = x => x == null ? "" : x > 0 ? "grn" : x < 0 ? "red" : "";
+const px = x => x == null ? "–" : "$" + (x >= 1 ? x.toFixed(4) : x.toPrecision(4));
+const ago = ts => { const m = Math.max(0, (Date.now() / 1000 - ts) / 60); return m < 1 ? "just now" : m < 60 ? `${Math.round(m)} min ago` : m < 2880 ? `${(m / 60).toFixed(1)} h ago` : `${Math.round(m / 1440)} d ago`; };
+const tm = ts => ts ? new Date(ts * 1000).toLocaleString([], { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "–";
+const shortMint = m => m ? m.slice(0, 4) + "…" + m.slice(-4) : "";
+const initials = s => esc((s || "?").replace(/[^A-Za-z0-9]/g, "").slice(0, 2).toUpperCase() || "?");
+function logo(c, extra = "") {
+  const u = safeUrl(c.image);
+  return `<div class="logo ${extra}">${u ? `<img src="${esc(u)}" alt="" referrerpolicy="no-referrer" onerror="this.parentNode.textContent='${initials(c.sym)}'">` : initials(c.sym)}</div>`;
+}
+// the link is used exactly as delivered in the feed (built by links.py on the box)
+function fomoBtn(link, ghost) {
+  const u = safeUrl(link);
+  return u ? `<a class="btn${ghost ? " ghost" : ""}" href="${esc(u)}" target="_blank" rel="noopener noreferrer">Open on FOMO</a>` : "";
+}
+const STALE_MIN = 20;
+let D = null, view = localStorage.getItem("desk_view") || "home", aIdx = 0;
+
+// ---------- screens ----------
+function renderHeader() {
+  const s = D.state, mode = s.mode === "LIVE" ? "LIVE" : "PAPER";
+  $("mode").textContent = mode; $("mode").className = "badge " + (mode === "LIVE" ? "b-live" : "b-paper");
+  const old = (Date.now() / 1000 - D.ts) / 60 > STALE_MIN;
+  $("upd").innerHTML = `<span class="${old ? "red" : ""}">Updated ${ago(D.ts)}</span>`;
+}
+
+function renderHome() {
+  const s = D.state, now = Date.now() / 1000, minsOld = (now - D.ts) / 60;
+  const bn = [];
+  if (minsOld > STALE_MIN) bn.push(`<div class="banner bn-red">⚠ No update for ${Math.round(minsOld)} min - the desk may be down (normal delay is up to ~10 min).</div>`);
+  if (s.lock?.on) bn.push(`<div class="banner bn-red">🔒 Desk locked: ${esc(s.lock.reason)} · until ${tm(s.lock.until)}</div>`);
+  if (s.pause?.on) bn.push(`<div class="banner bn-amb">⏸ Paused: ${esc(s.pause.reason)} · until ${tm(s.pause.until)}</div>`);
+  if (s.danger?.on) bn.push(`<div class="banner bn-amb">⚠ Market danger: ${esc(s.danger.reason)} · no new buys until ${tm(s.danger.until)}</div>`);
+  if (!bn.length) bn.push(`<div class="banner bn-grn">✓ Desk running normally - no lock, pause or market danger.</div>`);
+  const t = s.today || {}, st = s.stack || {}, r = s.rules || {};
+  const agents = Object.entries(D.agents || {}).sort();
+  $("v-home").innerHTML = bn.join("") + `<div class="homegrid"><div>
+    <div class="card"><div class="row"><span class="mut sm">Stack (${esc(s.mode)})</span><span class="sp"></span><span class="sm mut">started at ${usd(st.start)}</span></div>
+      <div class="big">${usd(st.equity)}</div>
+      <div class="grid2" style="margin-top:.6rem">
+        <div class="kv"><span class="mut sm">Today's P&L</span><b class="${cls(t.pnl)}">${usd(t.pnl, 1)} <span class="sm">${pct(t.pct)}</span></b></div>
+        <div class="kv"><span class="mut sm">Daily stop at</span><b>${usd(t.loss_stop_at)}</b></div>
+        <div class="kv"><span class="mut sm">Free cash</span><b>${usd(st.cash)}</b></div>
+        <div class="kv"><span class="mut sm">In trades</span><b>${usd(st.in_use)} · ${D.open.length} open</b></div>
+        <div class="kv"><span class="mut sm">Losses in a row</span><b class="${s.loss_streak ? "amb" : ""}">${s.loss_streak} / ${s.max_losses_in_row}</b></div>
+        <div class="kv"><span class="mut sm">Closed trades</span><b>${D.trades.length}</b></div>
+      </div></div>
+    <div class="card"><b>Hard rules</b><ul class="plain sm" style="margin-top:.4rem">
+      <li>✓ Spot only - <b>no leverage, ever</b></li>
+      <li>✓ Max ${esc(r.max_coin_pct)}% of the stack per coin</li>
+      <li>✓ No re-buy of a sold coin for ${esc(r.rebuy_cooldown_min)} min</li>
+      <li>✓ Daily loss stop at -${esc(r.daily_loss_stop_pct)}% locks the desk until midnight</li>
+      <li>✓ ${esc(s.max_losses_in_row)} losses in a row pause the desk</li></ul></div>
+  </div><div>
+    <div class="card"><div class="row"><b>Agents</b><span class="sp"></span><span class="sm mut">feed: ${esc(D.source)}</span></div><ul class="plain sm" style="margin-top:.4rem">
+      ${agents.length ? agents.map(([n, ts]) => { const late = (now - ts) / 60 > STALE_MIN;
+        return `<li class="row"><span class="dot" style="background:${late ? "var(--red)" : "var(--grn)"}"></span><span style="text-transform:capitalize">${esc(n)}</span><span class="sp"></span><span class="${late ? "red" : "mut"}">${late ? "silent " : ""}${ago(ts)}</span></li>`; }).join("")
+        : `<li class="mut">No agent heartbeats yet.</li>`}</ul></div>
+    <div class="card"><div class="row"><b>Latest</b><span class="sp"></span><button class="btn ghost" data-go="events">All events</button></div>
+      <ul class="plain sm" style="margin-top:.4rem">${D.events.slice(0, 5).map(evLi).join("") || `<li class="mut">Nothing yet.</li>`}</ul></div>
+    <div class="banner bn-blu sm">⚙ Settings are changed through the Telegram bot only (coming in a later step). This app is read-only.
+      ${safeUrl(s.profile) ? `<br><a class="btn ghost" style="margin-top:.5rem" href="${esc(safeUrl(s.profile))}" target="_blank" rel="noopener noreferrer">FOMO profile</a>` : ""}</div>
+  </div></div>`;
+}
+
+function auditList() {
+  return Object.entries(D.audits || {}).map(([mint, a]) => ({ mint, ...a })).sort((x, y) => y.ts - x.ts);
+}
+function boughtSize(mint) {
+  const p = D.open.find(p => p.mint === mint) || D.trades.find(t => t.mint === mint);
+  return p ? p.size : null;
+}
+function renderAudit() {
+  const L = auditList();
+  if (!L.length) { $("auditPane").innerHTML = `<div class="card mut">No coins audited yet.</div>`; renderSplitTrades(); return; }
+  aIdx = Math.max(0, Math.min(aIdx, L.length - 1));
+  const a = L[aIdx], ok = a.banner === "Cleared";
+  const nOk = L.filter(x => x.banner === "Cleared").length;
+  const checked = a.rows.filter(r => r.ok !== null && r.ok !== undefined);
+  const passed = checked.filter(r => r.ok).length;
+  const coin = D.coins.find(c => c.mint === a.mint) || {};
+  let verdict;
+  if (ok) {
+    const sz = boughtSize(a.mint);
+    verdict = sz != null ? `Cleared · ${passed}/${checked.length} parts · Sent to Executor · ${usd(sz)}`
+      : `Cleared · ${passed}/${checked.length} parts · ${coin.score != null ? `Analyst score ${Math.round(coin.score)} - not bought` : "waiting for Analyst"}`;
+  } else {
+    const main = (a.reasons[0] || (a.rows.find(r => r.ok === false) || {}).label || "failed checks").split(" - ")[0];
+    verdict = `Rejected · ${esc(main)} · desk won't buy ${esc(a.sym || shortMint(a.mint))}`;
+  }
+  $("auditPane").innerHTML = `
+    <div class="counters"><div class="counter"><b>${L.length}</b><span>Taken apart</span></div>
+      <div class="counter"><b class="red">${L.length - nOk}</b><span>Rejected</span></div>
+      <div class="counter"><b class="grn">${nOk}</b><span>Cleared</span></div></div>
+    <div class="card" id="acard">
+      <div class="coin">${logo(a)}<div><div style="font-weight:800;font-size:1.15rem">${esc(a.sym || "?")}</div>
+        <div class="sm mut">${esc(a.name || "")}</div><div class="sm mut">${esc(shortMint(a.mint))} · Solana · ${ago(a.ts)}</div></div>
+        <span class="pill ${ok ? "p-ok" : "p-bad"}">${ok ? "Cleared" : "Rejected"}</span></div>
+      <div class="checks">${a.rows.map((r, i) => {
+        const st = r.ok === true ? "ok" : r.ok === false ? "bad" : "na";
+        return `<div class="chk ${st}" style="animation-delay:${i * 45}ms"><div class="ic ic-${st}">${st === "ok" ? "✓" : st === "bad" ? "!" : "–"}</div>
+          <div><div class="lab">${esc(r.label)}</div><div class="val">${esc(r.value)}</div></div></div>`; }).join("")}</div>
+      <div class="verdict ${ok ? "v-ok" : "v-bad"}">${verdict}</div>
+      <div class="row" style="margin-top:.7rem">${fomoBtn(a.link, true)}<span class="sp"></span><span class="sm mut">${aIdx + 1} / ${L.length}</span></div>
+    </div>
+    <div class="nav2"><button id="aPrev" aria-label="previous coin">‹</button>
+      <div class="dots">${L.map((x, i) => `<i class="${i === aIdx ? "on" : ""} ${x.banner === "Cleared" ? "g" : "r"}" data-i="${i}"></i>`).join("")}</div>
+      <button id="aNext" aria-label="next coin">›</button></div>
+    <p class="sm mut" style="text-align:center">Swipe or tap ‹ › to flip through coins. All checks run on every coin.</p>`;
+  $("aPrev").onclick = () => { aIdx = (aIdx - 1 + L.length) % L.length; renderAudit(); };
+  $("aNext").onclick = () => { aIdx = (aIdx + 1) % L.length; renderAudit(); };
+  document.querySelectorAll(".dots i").forEach(d => d.onclick = () => { aIdx = +d.dataset.i; renderAudit(); });
+  renderSplitTrades();
+}
+function renderSplitTrades() { $("splitTrades").innerHTML = tradesHtml(true); }
+
+function renderCoins() {
+  const C = D.coins;
+  $("v-coins").innerHTML = `<div class="card"><div class="row"><b>Coins (last 24h)</b><span class="sp"></span><span class="sm mut">${C.length}</span></div>
+    ${C.map(c => `<div class="item"><div class="row">${logo(c, "lg")}<div style="min-width:0;flex:1">
+      <div class="row"><b>${esc(c.sym || shortMint(c.mint))}</b><span class="stage st-${esc(c.stage)}">${esc(c.stage)}</span>
+        ${c.score != null ? `<span class="sm mut">score ${Math.round(c.score)}</span>` : ""}<span class="sp"></span><span class="sm mut">${ago(c.ts)}</span></div>
+      <div class="sm mut">${esc(c.why || c.scan?.reason || (c.audit ? "Audit: " + c.audit : ""))}</div>
+      ${c.scan ? `<div class="sm mut">liq $${c.scan.liq != null ? Math.round(c.scan.liq).toLocaleString() : "–"} · 1h ${pct(c.scan.h1)}</div>` : ""}</div></div>
+      <div class="row" style="margin-top:.4rem">${c.audit ? `<button class="btn ghost" data-audit="${esc(c.mint)}">Audit</button>` : ""}<span class="sp"></span>${fomoBtn(c.link, true)}</div></div>`).join("")
+      || `<p class="mut">No coins yet.</p>`}</div>`;
+  document.querySelectorAll("[data-audit]").forEach(b => b.onclick = () => {
+    aIdx = auditList().findIndex(a => a.mint === b.dataset.audit); show("audit"); });
+}
+
+function tradesHtml(compact) {
+  const O = D.open, T = D.trades;
+  const open = O.map(p => `<div class="item"><div class="row">${logo(p, "lg")}<div style="flex:1"><div class="row"><b>${esc(p.sym || shortMint(p.mint))}</b>
+      <span class="stage">${esc(p.mode)}</span>${p.trail ? `<span class="stage st-held">trailing</span>` : ""}<span class="sp"></span>
+      <b class="${cls(p.upnl)}">${usd(p.upnl, 1)} <span class="sm">${pct(p.upnl_pct)}</span></b></div>
+      <div class="sm mut">${usd(p.size)} in · entry ${px(p.entry)} · now ${px(p.last)} · stop ${px(p.stop)}</div>
+      <div class="sm mut">opened ${tm(p.opened)} · fees ${usd(p.fees)}</div></div></div>
+      <div class="row" style="margin-top:.4rem"><span class="sp"></span>${fomoBtn(p.link)}</div></div>`).join("");
+  const closed = T.map(t => `<div class="item"><div class="row"><b>${esc(t.sym || shortMint(t.mint))}</b><span class="sm mut">${tm(t.closed)}</span><span class="sp"></span>
+      <b class="${cls(t.pnl)}">${usd(t.pnl, 1)} <span class="sm">${pct(t.pnl_pct)}</span></b></div>
+      <div class="sm mut">${usd(t.size)} · ${px(t.entry)} → ${px(t.exit)} · ${esc(t.reason || "")}</div>
+      <div class="row" style="margin-top:.4rem"><span class="sp"></span>${fomoBtn(t.link, true)}</div></div>`).join("");
+  const total = T.reduce((s, t) => s + (t.pnl || 0), 0);
+  return `<div class="card"><div class="row"><b>Open positions${compact ? " (live)" : ""}</b><span class="sp"></span><span class="sm mut">${O.length}</span></div>
+      ${open || `<p class="mut sm">No open positions.</p>`}</div>
+    <div class="card"><div class="row"><b>Closed trades</b><span class="sp"></span><span class="sm ${cls(total)}">${T.length ? usd(total, 1) + " total" : ""}</span></div>
+      ${closed || `<p class="mut sm">No closed trades yet.</p>`}</div>`;
+}
+function renderTrades() { $("v-trades").innerHTML = tradesHtml(false); }
+
+const evLi = e => `<li><div class="row"><span class="stage">${esc(e.kind)}</span><b class="sm">${esc(e.title)}</b><span class="sp"></span><span class="sm mut">${tm(e.ts)}</span></div>
+  ${e.sub ? `<div class="sm mut">${esc(e.sub)}</div>` : ""}</li>`;
+function renderEvents() {
+  $("v-events").innerHTML = `<div class="card"><b>Recent events</b><ul class="plain" style="margin-top:.4rem">${D.events.map(evLi).join("") || `<li class="mut">Nothing yet.</li>`}</ul></div>`;
+}
+
+function show(v) {
+  view = v; localStorage.setItem("desk_view", v);
+  document.querySelectorAll(".view").forEach(s => s.classList.toggle("on", s.id === "v-" + v));
+  document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.v === v));
+  if (D) ({ home: renderHome, audit: renderAudit, coins: renderCoins, trades: renderTrades, events: renderEvents })[v]();
+  window.scrollTo(0, 0);
+}
+document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => show(b.dataset.v));
+document.addEventListener("click", e => { const g = e.target.closest("[data-go]"); if (g) show(g.dataset.go); });
+
+// swipe between coins on the Auditor screen
+let sx = null, sy = null;
+$("v-audit").addEventListener("touchstart", e => { sx = e.touches[0].clientX; sy = e.touches[0].clientY; }, { passive: true });
+$("v-audit").addEventListener("touchend", e => {
+  if (sx == null) return; const dx = e.changedTouches[0].clientX - sx, dy = e.changedTouches[0].clientY - sy; sx = null;
+  if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) { const n = auditList().length; if (n) { aIdx = (aIdx + (dx < 0 ? 1 : -1) + n) % n; renderAudit(); } }
+}, { passive: true });
+document.addEventListener("keydown", e => { if (view === "audit" && (e.key === "ArrowRight" || e.key === "ArrowLeft")) $(e.key === "ArrowRight" ? "aNext" : "aPrev")?.click(); });
+
+async function refresh() {
   try {
-    const d = await load("desk");   // Step 5 feed; the full screens come in Step 6
-    el.textContent = `Connected · ${d.state.mode} · ${new Date(d.ts * 1000).toLocaleString()} · ` +
-      `${d.coins.length} coins · ${d.open.length} open · stack $${d.state.stack.equity}`;
-    el.className = "ok";
+    D = await load("desk");
+    renderHeader(); show(view);
   } catch (e) {
-    el.textContent = "Cannot decrypt · wrong or missing token";
-    el.className = "err";
+    if (!D) { $("lock").style.display = "block"; $("app").style.display = "none";
+      $("lockmsg").textContent = "Cannot open the desk data - wrong or missing token. Open your secret desk link again."; }
+    else $("upd").innerHTML = `<span class="red">Update failed · showing data from ${ago(D.ts)}</span>`;
     console.error(e);
   }
-})();
+}
+
+if (!deskToken()) { $("lock").style.display = "block"; $("app").style.display = "none"; $("tabs").style.display = "none"; $("upd").textContent = ""; }
+else { show(view); refresh(); setInterval(refresh, 60000); setInterval(() => D && renderHeader(), 30000); }
 </script>
 </body>
 </html>
