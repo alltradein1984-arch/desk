@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#000000">
+<title>Desk</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  html,body{margin:0;height:100%;background:#000;color:#eee;font:16px/1.4 -apple-system,system-ui,Segoe UI,Roboto,sans-serif}
+  main{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:.6rem}
+  h1{margin:0;font-weight:600;letter-spacing:.04em}
+  #status{color:#888}
+  #status.ok{color:#3ddc84}
+  #status.err{color:#ff5c5c}
+</style>
+</head>
+<body>
+<main>
+  <h1>Desk</h1>
+  <div id="status">Loading…</div>
+</main>
+<script>
+// Token comes from the URL fragment (#t=...), which browsers never send to the server.
+// It is kept in localStorage and removed from the address bar.
+(function () {
+  const KEY = "desk_app_token";
+  const m = location.hash.match(/(?:^#|&)t=([^&]+)/);
+  if (m) {
+    localStorage.setItem(KEY, decodeURIComponent(m[1]));
+    history.replaceState(null, "", location.pathname + location.search);
+  }
+  window.deskToken = () => localStorage.getItem(KEY);
+})();
+
+const b64d = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+
+async function decryptEnvelope(env, token) {
+  if (env.v !== 1 || env.alg !== "AES-256-GCM" || env.kdf !== "PBKDF2-SHA256") throw new Error("unsupported envelope");
+  const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(token), "PBKDF2", false, ["deriveKey"]);
+  const key = await crypto.subtle.deriveKey(
+    { name: "PBKDF2", hash: "SHA-256", salt: b64d(env.salt), iterations: env.iter },
+    base, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
+  const pt = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv: b64d(env.iv), additionalData: new TextEncoder().encode(env.aad || "") },
+    key, b64d(env.ct));
+  return JSON.parse(new TextDecoder().decode(pt));
+}
+
+async function load(name) {
+  const r = await fetch(`data/${name}.enc.json?ts=${Date.now()}`, { cache: "no-store" });
+  if (!r.ok) throw new Error(`fetch ${name}: HTTP ${r.status}`);
+  return decryptEnvelope(await r.json(), deskToken());
+}
+
+(async () => {
+  const el = document.getElementById("status");
+  if (!deskToken()) { el.textContent = "Locked · open the link with #t=…"; el.className = "err"; return; }
+  try {
+    const s = await load("state");
+    el.textContent = `Connected · ${s.mode} · ${new Date(s.ts * 1000).toLocaleString()}`;
+    el.className = "ok";
+  } catch (e) {
+    el.textContent = "Cannot decrypt · wrong or missing token";
+    el.className = "err";
+    console.error(e);
+  }
+})();
+</script>
+</body>
+</html>
