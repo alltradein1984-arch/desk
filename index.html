@@ -214,6 +214,11 @@ function fomoBtn(link, ghost) {
   const u = safeUrl(link);
   return u ? `<a class="btn${ghost ? " ghost" : ""}" href="${esc(u)}" target="_blank" rel="noopener noreferrer">Open on FOMO</a>` : "";
 }
+// DexScreener chart: the feed's chart_url, used as given; only https://dexscreener.com/... is accepted
+function chartBtn(u) {
+  return (typeof u === "string" && /^https:\/\/dexscreener\.com\/[A-Za-z0-9\/]+$/.test(u))
+    ? `<a class="btn ghost" href="${esc(u)}" target="_blank" rel="noopener noreferrer">Open chart</a>` : "";
+}
 const STALE_MIN = 20;
 let D = null, view = localStorage.getItem("desk_view") || "home", aIdx = 0;
 
@@ -302,7 +307,7 @@ function renderAudit() {
         return `<div class="chk ${st}" style="animation-delay:${i * 45}ms"><div class="ic ic-${st}">${st === "ok" ? "✓" : st === "bad" ? "!" : "–"}</div>
           <div><div class="lab">${esc(r.label)}</div><div class="val">${esc(r.value)}</div></div></div>`; }).join("")}</div>
       <div class="verdict ${ok ? "v-ok" : "v-bad"}">${verdict}</div>
-      <div class="row" style="margin-top:.7rem">${fomoBtn(a.link, true)}<span class="sp"></span><span class="sm mut">${aIdx + 1} / ${L.length}</span></div>
+      <div class="row" style="margin-top:.7rem"><span class="row" style="gap:.4rem;flex-wrap:wrap">${fomoBtn(a.link, true)}${chartBtn(a.chart_url)}</span><span class="sp"></span><span class="sm mut">${aIdx + 1} / ${L.length}</span></div>
     </div>
     <div class="nav2"><button id="aPrev" aria-label="previous coin">‹</button>
       <div class="dots">${L.map((x, i) => `<i class="${i === aIdx ? "on" : ""} ${x.banner === "Cleared" ? "g" : "r"}" data-i="${i}"></i>`).join("")}</div>
@@ -323,7 +328,7 @@ function renderCoins() {
         ${c.score != null ? `<span class="sm mut">score ${Math.round(c.score)}</span>` : ""}<span class="sp"></span><span class="sm mut">${ago(c.ts)}</span></div>
       <div class="sm mut">${esc(c.why || c.scan?.reason || (c.audit ? "Audit: " + c.audit : ""))}</div>
       ${c.scan ? `<div class="sm mut">liq $${c.scan.liq != null ? Math.round(c.scan.liq).toLocaleString() : "–"} · 1h ${pct(c.scan.h1)}</div>` : ""}</div></div>
-      <div class="row" style="margin-top:.4rem">${c.audit ? `<button class="btn ghost" data-audit="${esc(c.mint)}">Audit</button>` : ""}<span class="sp"></span>${fomoBtn(c.link, true)}</div></div>`).join("")
+      <div class="row" style="margin-top:.4rem">${c.audit ? `<button class="btn ghost" data-audit="${esc(c.mint)}">Audit</button>` : ""}<span class="sp"></span>${chartBtn(c.chart_url)}${fomoBtn(c.link, true)}</div></div>`).join("")
       || `<p class="mut">No coins yet.</p>`}</div>`;
   document.querySelectorAll("[data-audit]").forEach(b => b.onclick = () => {
     aIdx = auditList().findIndex(a => a.mint === b.dataset.audit); show("audit"); });
@@ -336,11 +341,11 @@ function tradesHtml(compact) {
       <b class="${cls(p.upnl)}">${usd(p.upnl, 1)} <span class="sm">${pct(p.upnl_pct)}</span></b></div>
       <div class="sm mut">${usd(p.size)} in · entry ${px(p.entry)} · now ${px(p.last)} · stop ${px(p.stop)}</div>
       <div class="sm mut">opened ${tm(p.opened)} · fees ${usd(p.fees)}</div></div></div>
-      <div class="row" style="margin-top:.4rem"><span class="sp"></span>${fomoBtn(p.link)}</div></div>`).join("");
+      <div class="row" style="margin-top:.4rem"><span class="sp"></span>${chartBtn(p.chart_url)}${fomoBtn(p.link)}</div></div>`).join("");
   const closed = T.map(t => `<div class="item"><div class="row"><b>${esc(t.sym || shortMint(t.mint))}</b><span class="sm mut">${tm(t.closed)}</span><span class="sp"></span>
       <b class="${cls(t.pnl)}">${usd(t.pnl, 1)} <span class="sm">${pct(t.pnl_pct)}</span></b></div>
       <div class="sm mut">${usd(t.size)} · ${px(t.entry)} → ${px(t.exit)} · ${esc(t.reason || "")}</div>
-      <div class="row" style="margin-top:.4rem"><span class="sp"></span>${fomoBtn(t.link, true)}</div></div>`).join("");
+      <div class="row" style="margin-top:.4rem"><span class="sp"></span>${chartBtn(t.chart_url)}${fomoBtn(t.link, true)}</div></div>`).join("");
   const total = T.reduce((s, t) => s + (t.pnl || 0), 0);
   return `<div class="card"><div class="row"><b>Open positions${compact ? " (live)" : ""}</b><span class="sp"></span><span class="sm mut">${O.length}</span></div>
       ${open || `<p class="mut sm">No open positions.</p>`}</div>
