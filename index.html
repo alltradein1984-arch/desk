@@ -69,6 +69,14 @@ ul.plain{list-style:none;margin:0;padding:0}ul.plain li{padding:.45rem 0;border-
 .btn{display:inline-block;text-decoration:none;font-weight:700;font-size:.85rem;color:#06110b;background:var(--grn);padding:.45rem .8rem;border-radius:10px;white-space:nowrap}
 .btn.ghost{background:transparent;color:var(--txt);border:1px solid var(--line)}
 .stage{font-size:.7rem;font-weight:700;padding:.12rem .45rem;border-radius:6px;text-transform:uppercase;letter-spacing:.05em;background:#222a35;color:var(--mut)}
+.score{font-weight:700;font-size:.8rem;padding:.05rem .45rem;border-radius:.5rem}.score.hi{background:#123524;color:var(--grn)}.score.lo{background:#3a121a;color:var(--red)}
+.parts{margin:.35rem 0 .2rem;display:grid;gap:.18rem}.part{display:grid;grid-template-columns:5.2rem 1fr 2rem;align-items:center;gap:.4rem;font-size:.72rem}
+.part span{opacity:.75}.part i{display:block;height:.38rem;border-radius:.3rem;background:rgba(127,127,127,.22);overflow:hidden}
+.part b{display:block;height:100%;background:var(--grn)}.part em{font-style:normal;text-align:right;opacity:.8}.blk{color:var(--red)}
+.st-vetoed,.st-blocked,.st-rugged{background:#3a121a;color:var(--red)}
+.st-watch{background:#10263f;color:#7cb7ff}.addrow{display:flex;gap:.5rem;margin:.55rem 0 .35rem;flex-wrap:wrap}
+.addrow input{flex:1 1 14rem;min-width:0;font:inherit;font-size:.9rem;padding:.6rem .7rem;border-radius:.6rem;border:1px solid rgba(127,127,127,.35);background:transparent;color:inherit}
+.addrow input:focus{outline:2px solid #3b82f6;outline-offset:1px}
 .st-held,.st-approved,.st-cleared,.st-candidate{background:#123524;color:var(--grn)}.st-rejected,.st-reject{background:#3a121a;color:var(--red)}.st-wait,.st-scored{background:#2a2410;color:var(--amb)}
 .item{padding:.75rem 0;border-bottom:1px solid var(--line)}.item:last-child{border:0}
 .lg{width:34px;height:34px;font-size:.75rem}
@@ -89,6 +97,9 @@ html[data-theme="light"] .p-ok,html[data-theme="light"] .ic-ok,html[data-theme="
 html[data-theme="light"] .p-bad,html[data-theme="light"] .ic-bad,html[data-theme="light"] .st-rejected,html[data-theme="light"] .st-reject{background:#ffe8eb;border-color:#f5b5bf}
 html[data-theme="light"] .st-wait,html[data-theme="light"] .st-scored{background:#fff2d9}
 html[data-theme="light"] .stage,html[data-theme="light"] .ic-na{background:#e8ecf1}
+html[data-theme="light"] .st-vetoed,html[data-theme="light"] .st-blocked,html[data-theme="light"] .st-rugged,html[data-theme="light"] .score.lo{background:#ffe8eb}
+html[data-theme="light"] .score.hi{background:#e2f6ea}
+html[data-theme="light"] .st-watch{background:#e3efff;color:#1a4f93}html[data-theme="light"] .addrow input{background:#fff}
 html[data-theme="light"] .chk.bad .val{color:#c0283d}
 html[data-theme="light"] .v-ok{background:linear-gradient(90deg,#dcf5e7,#effaf4);border-color:#a9e2c2;color:#0b6b3b}
 html[data-theme="light"] .v-bad{background:linear-gradient(90deg,#ffe1e6,#fff1f3);border-color:#f5b5bf;color:#9b1c2e}
@@ -265,7 +276,7 @@ function renderHome() {
     <div class="card"><div class="row"><b>Latest</b><span class="sp"></span><button class="btn ghost" data-go="events">All events</button></div>
       <ul class="plain sm" style="margin-top:.4rem">${D.events.slice(0, 5).map(evLi).join("") || `<li class="mut">Nothing yet.</li>`}</ul></div>
     <div class="card" id="alerts">${alertsHtml()}</div>
-    <div class="banner bn-blu sm">⚙ Settings are changed through the Telegram bot only (coming in a later step). This app is read-only.
+    <div class="banner bn-blu sm">⚙ Settings and commands go through your Telegram bot (@Alltradein_bot). This app is read-only.
       ${safeUrl(s.profile) ? `<br><a class="btn ghost" style="margin-top:.5rem" href="${esc(safeUrl(s.profile))}" target="_blank" rel="noopener noreferrer">FOMO profile</a>` : ""}</div>
   </div></div>`;
   bindAlerts();
@@ -322,13 +333,58 @@ function renderAudit() {
 }
 function renderSplitTrades() { $("splitTrades").innerHTML = tradesHtml(true); }
 
+// Step 8: trade score breakdown (feed score_parts, each 0-100)
+const PARTS = [["safety", "Safety"], ["liquidity", "Liquidity"], ["momentum", "Momentum"], ["holders", "Holders"], ["social", "Social"]];
+function scoreParts(c) {
+  const P = c.score_parts; if (!P) return "";
+  return `<div class="parts">${PARTS.map(([k, l]) => { const v = Math.max(0, Math.min(100, +P[k] || 0));
+    return `<div class="part"><span>${l}</span><i><b style="width:${v}%"></b></i><em>${Math.round(v)}</em></div>`; }).join("")}
+    <div class="sm mut">Trade score ${Math.round(c.score)} / 100 · alerts need ${Math.round(c.score_min ?? 70)}+</div></div>`;
+}
+
+// Step 9: "Add coin" box -> Telegram deep link https://t.me/Alltradein_bot?start=add_<CA> (the bot runs /add).
+// The CA is checked here first: base58 alphabet, 32-44 chars, decodes to exactly 32 bytes.
+const BOT = "Alltradein_bot", B58A = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+function b58len(s) {
+  const b = [0];
+  for (const ch of s) {
+    let carry = B58A.indexOf(ch); if (carry < 0) return -1;
+    for (let i = 0; i < b.length; i++) { carry += b[i] * 58; b[i] = carry & 255; carry >>= 8; }
+    while (carry) { b.push(carry & 255); carry >>= 8; }
+  }
+  while (b.length && b[b.length - 1] === 0) b.pop();
+  let z = 0; for (const ch of s) { if (ch === "1") z++; else break; }
+  return z + b.length;
+}
+function validCA(s) { return typeof s === "string" && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(s) && b58len(s) === 32; }
+function addCoinLink(ca) { ca = String(ca ?? "").trim(); return validCA(ca) ? `https://t.me/${BOT}?start=add_${ca}` : null; }
+function addBoxHtml() {
+  return `<div class="card" id="addbox"><div class="row"><b>Add coin</b><span class="sp"></span><span class="sm mut">checked by your Telegram bot</span></div>
+    <div class="addrow"><input id="addca" type="text" inputmode="text" autocomplete="off" autocapitalize="off" spellcheck="false"
+      placeholder="Paste a Solana coin address (CA)" aria-label="Coin address" maxlength="64">
+      <button class="btn" id="addgo" type="button">Check in Telegram</button></div>
+    <div class="sm mut" id="addmsg">Opens Telegram with <code>/add</code> filled in: full safety check, score, then it joins your watchlist.</div></div>`;
+}
+function wireAddBox() {
+  const go = () => {
+    const v = $("addca").value.trim(), link = addCoinLink(v), msg = $("addmsg");
+    if (!link) { msg.className = "sm blk"; msg.textContent = v ? "That is not a valid Solana address (base58, 32-44 characters)." : "Paste a coin address first."; return; }
+    msg.className = "sm mut"; msg.textContent = "Opening Telegram…";
+    const w = window.open(link, "_blank", "noopener"); if (!w) location.assign(link);
+  };
+  $("addgo").onclick = go;
+  $("addca").onkeydown = e => { if (e.key === "Enter") go(); };
+}
+
 function renderCoins() {
   const C = D.coins;
-  $("v-coins").innerHTML = `<div class="card"><div class="row"><b>Coins (last 24h)</b><span class="sp"></span><span class="sm mut">${C.length}</span></div>
+  if (!$("addbox")) { $("v-coins").innerHTML = addBoxHtml() + `<div id="coinlist"></div>`; wireAddBox(); }   // keeps typed text across refreshes
+  $("coinlist").innerHTML = `<div class="card"><div class="row"><b>Coins (last 24h)</b><span class="sp"></span><span class="sm mut">${C.length}</span></div>
     ${C.map(c => `<div class="item"><div class="row">${logo(c, "lg")}<div style="min-width:0;flex:1">
-      <div class="row"><b>${esc(c.sym || shortMint(c.mint))}</b><span class="stage st-${esc(c.stage)}">${esc(c.stage)}</span>
-        ${c.score != null ? `<span class="sm mut">score ${Math.round(c.score)}</span>` : ""}<span class="sp"></span><span class="sm mut">${ago(c.ts)}</span></div>
-      <div class="sm mut">${esc(c.why || c.scan?.reason || (c.audit ? "Audit: " + c.audit : ""))}</div>
+      <div class="row"><b>${esc(c.sym || shortMint(c.mint))}</b><span class="stage st-${esc(c.stage)}">${esc(c.stage)}</span>${c.watch ? `<span class="stage st-watch">Watchlist</span>` : ""}
+        ${c.score != null ? `<span class="score ${c.score >= (c.score_min ?? 70) ? "hi" : "lo"}">${Math.round(c.score)}</span>` : ""}<span class="sp"></span><span class="sm mut">${ago(c.ts)}</span></div>
+      ${scoreParts(c)}
+      <div class="sm ${c.blocked ? "blk" : "mut"}">${esc(c.why || c.scan?.reason || (c.audit ? "Audit: " + c.audit : ""))}</div>
       ${c.scan ? `<div class="sm mut">liq $${c.scan.liq != null ? Math.round(c.scan.liq).toLocaleString() : "–"} · 1h ${pct(c.scan.h1)}</div>` : ""}</div></div>
       <div class="row" style="margin-top:.4rem">${c.audit ? `<button class="btn ghost" data-audit="${esc(c.mint)}">Audit</button>` : ""}<span class="sp"></span>${chartBtn(c.chart_url)}${fomoBtn(c.link, true)}</div></div>`).join("")
       || `<p class="mut">No coins yet.</p>`}</div>`;
