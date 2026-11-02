@@ -7,6 +7,14 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' https: data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="theme-color" content="#07090c">
 <title>Desk</title>
+<script>
+// set the theme before first paint (no dark flash at night); full logic + toggle is at the bottom
+(function () { try {
+  const p = localStorage.getItem("desk_theme") || "auto";
+  const h = +new Intl.DateTimeFormat("en-GB", { hour: "2-digit", hourCycle: "h23", timeZone: "Europe/Amsterdam" }).format(new Date());
+  document.documentElement.dataset.theme = p === "light" || p === "dark" ? p : (h >= 22 || h < 7 ? "light" : "dark");
+} catch (e) {} })();
+</script>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-192.png">
@@ -68,6 +76,25 @@ nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:6;display:flex;backgroun
 nav.tabs button{flex:1;background:none;border:0;color:var(--mut);padding:.55rem 0 .6rem;font-size:.72rem;display:flex;flex-direction:column;align-items:center;gap:2px}
 nav.tabs button svg{width:22px;height:22px}
 nav.tabs button.on{color:var(--txt)}
+
+/* light theme (Auto = light 22:00-07:00 Amsterdam time, dark otherwise) */
+html[data-theme="light"]{--bg:#f4f6f9;--card:#ffffff;--card2:#eef1f5;--line:#dde3ea;--txt:#11161d;--mut:#5d6775;--grn:#0e9f56;--red:#d42c43;--amb:#a86a0c;--blu:#1f6fd1}
+html[data-theme="light"] header{background:rgba(244,246,249,.93)}
+html[data-theme="light"] nav.tabs{background:rgba(255,255,255,.97)}
+html[data-theme="light"] .b-paper{background:#fff4dd;border-color:#f0cf8a}html[data-theme="light"] .b-live{background:#ffe5e9;border-color:#f3a6b1}
+html[data-theme="light"] .bn-red{background:#ffeef0;border-color:#f5b5bf;color:#9b1c2e}html[data-theme="light"] .bn-amb{background:#fff6e5;border-color:#f0d39a;color:#7a4d06}
+html[data-theme="light"] .bn-grn{background:#e8f8ef;border-color:#a9e2c2;color:#0b6b3b}html[data-theme="light"] .bn-blu{background:#eaf2fd;border-color:#b5d0f3;color:#1a4f93}
+html[data-theme="light"] .logo{background:linear-gradient(135deg,#dfe5ee,#c9d2de);color:#2a3442}
+html[data-theme="light"] .p-ok,html[data-theme="light"] .ic-ok,html[data-theme="light"] .st-held,html[data-theme="light"] .st-approved,html[data-theme="light"] .st-cleared,html[data-theme="light"] .st-candidate{background:#e2f6ea;border-color:#a9e2c2}
+html[data-theme="light"] .p-bad,html[data-theme="light"] .ic-bad,html[data-theme="light"] .st-rejected,html[data-theme="light"] .st-reject{background:#ffe8eb;border-color:#f5b5bf}
+html[data-theme="light"] .st-wait,html[data-theme="light"] .st-scored{background:#fff2d9}
+html[data-theme="light"] .stage,html[data-theme="light"] .ic-na{background:#e8ecf1}
+html[data-theme="light"] .chk.bad .val{color:#c0283d}
+html[data-theme="light"] .v-ok{background:linear-gradient(90deg,#dcf5e7,#effaf4);border-color:#a9e2c2;color:#0b6b3b}
+html[data-theme="light"] .v-bad{background:linear-gradient(90deg,#ffe1e6,#fff1f3);border-color:#f5b5bf;color:#9b1c2e}
+html[data-theme="light"] .dots i{background:#cfd6df}
+html[data-theme="light"] .btn{color:#fff}html[data-theme="light"] .btn.ghost{color:var(--txt)}
+#theme{background:var(--card2);color:var(--txt);border:1px solid var(--line);border-radius:99px;font-size:.72rem;padding:.2rem .6rem;cursor:pointer}
 #lock{display:none;text-align:center;padding:4rem 1rem}
 .split-trades{display:none}
 @media (min-width:960px){
@@ -85,6 +112,7 @@ nav.tabs button.on{color:var(--txt)}
 <header>
   <h1>DESK</h1><span id="mode" class="badge b-paper">…</span>
   <div class="upd" id="upd">Loading…</div>
+  <button id="theme" title="Theme: Auto = light 22:00-07:00, dark in the day">Auto</button>
 </header>
 <nav class="tabs" id="tabs">
   <button data-v="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Home</button>
@@ -140,6 +168,30 @@ async function load(name) {
   if (!r.ok) throw new Error(`fetch ${name}: HTTP ${r.status}`);
   return decryptEnvelope(await r.json(), deskToken());
 }
+
+
+// ---------- theme: Auto (default) = LIGHT 22:00-07:00 Europe/Amsterdam, DARK otherwise; or fixed Dark / Light ----------
+const THEME_KEY = "desk_theme", THEMES = ["auto", "dark", "light"];
+const LIGHT_FROM = 22, LIGHT_UNTIL = 7;
+function amsterdamHour(d = new Date()) {
+  try { return +new Intl.DateTimeFormat("en-GB", { hour: "2-digit", hourCycle: "h23", timeZone: "Europe/Amsterdam" }).format(d); }
+  catch (e) { return d.getHours(); }      // fallback: device clock
+}
+function autoTheme(d) { const h = amsterdamHour(d); return (h >= LIGHT_FROM || h < LIGHT_UNTIL) ? "light" : "dark"; }
+function applyTheme() {
+  let pref = localStorage.getItem(THEME_KEY); if (!THEMES.includes(pref)) pref = "auto";
+  const t = pref === "auto" ? autoTheme() : pref;
+  document.documentElement.dataset.theme = t;
+  document.querySelector('meta[name="theme-color"]').setAttribute("content", t === "light" ? "#f4f6f9" : "#07090c");
+  const b = document.getElementById("theme");
+  if (b) b.textContent = pref === "auto" ? `Auto · ${t === "light" ? "Light" : "Dark"}` : (pref === "light" ? "Light" : "Dark");
+}
+applyTheme();
+setInterval(applyTheme, 60000);          // Auto flips at 22:00 / 07:00 without a reload
+document.getElementById("theme").onclick = () => {
+  const cur = THEMES.includes(localStorage.getItem(THEME_KEY)) ? localStorage.getItem(THEME_KEY) : "auto";
+  localStorage.setItem(THEME_KEY, THEMES[(THEMES.indexOf(cur) + 1) % THEMES.length]); applyTheme();
+};
 
 // ---------- helpers ----------
 const $ = id => document.getElementById(id);
