@@ -38,15 +38,21 @@
 
 const b64d = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
 
+async function gunzip(buf) {
+  const ds = new Blob([buf]).stream().pipeThrough(new DecompressionStream("gzip"));
+  return new Uint8Array(await new Response(ds).arrayBuffer());
+}
+
 async function decryptEnvelope(env, token) {
-  if (env.v !== 1 || env.alg !== "AES-256-GCM" || env.kdf !== "PBKDF2-SHA256") throw new Error("unsupported envelope");
+  if (![1, 2].includes(env.v) || env.alg !== "AES-256-GCM" || env.kdf !== "PBKDF2-SHA256") throw new Error("unsupported envelope");
   const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(token), "PBKDF2", false, ["deriveKey"]);
   const key = await crypto.subtle.deriveKey(
     { name: "PBKDF2", hash: "SHA-256", salt: b64d(env.salt), iterations: env.iter },
     base, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
-  const pt = await crypto.subtle.decrypt(
+  let pt = new Uint8Array(await crypto.subtle.decrypt(
     { name: "AES-GCM", iv: b64d(env.iv), additionalData: new TextEncoder().encode(env.aad || "") },
-    key, b64d(env.ct));
+    key, b64d(env.ct)));
+  if (env.z === "gzip") pt = await gunzip(pt);
   return JSON.parse(new TextDecoder().decode(pt));
 }
 
@@ -60,8 +66,9 @@ async function load(name) {
   const el = document.getElementById("status");
   if (!deskToken()) { el.textContent = "Locked · open the link with #t=…"; el.className = "err"; return; }
   try {
-    const s = await load("state");
-    el.textContent = `Connected · ${s.mode} · ${new Date(s.ts * 1000).toLocaleString()}`;
+    const d = await load("desk");   // Step 5 feed; the full screens come in Step 6
+    el.textContent = `Connected · ${d.state.mode} · ${new Date(d.ts * 1000).toLocaleString()} · ` +
+      `${d.coins.length} coins · ${d.open.length} open · stack $${d.state.stack.equity}`;
     el.className = "ok";
   } catch (e) {
     el.textContent = "Cannot decrypt · wrong or missing token";
