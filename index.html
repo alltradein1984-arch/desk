@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="referrer" content="no-referrer">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' https: data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' https: data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="theme-color" content="#07090c">
 <title>Desk</title>
 <script>
@@ -264,9 +264,11 @@ function renderHome() {
         : `<li class="mut">No agent heartbeats yet.</li>`}</ul></div>
     <div class="card"><div class="row"><b>Latest</b><span class="sp"></span><button class="btn ghost" data-go="events">All events</button></div>
       <ul class="plain sm" style="margin-top:.4rem">${D.events.slice(0, 5).map(evLi).join("") || `<li class="mut">Nothing yet.</li>`}</ul></div>
+    <div class="card" id="alerts">${alertsHtml()}</div>
     <div class="banner bn-blu sm">⚙ Settings are changed through the Telegram bot only (coming in a later step). This app is read-only.
       ${safeUrl(s.profile) ? `<br><a class="btn ghost" style="margin-top:.5rem" href="${esc(safeUrl(s.profile))}" target="_blank" rel="noopener noreferrer">FOMO profile</a>` : ""}</div>
   </div></div>`;
+  bindAlerts();
 }
 
 function auditList() {
@@ -379,6 +381,65 @@ $("v-audit").addEventListener("touchend", e => {
 }, { passive: true });
 document.addEventListener("keydown", e => { if (view === "audit" && (e.key === "ArrowRight" || e.key === "ArrowLeft")) $(e.key === "ArrowRight" ? "aNext" : "aPrev")?.click(); });
 
+
+// ---------- phone alerts (Web Push) ----------
+// The box cannot receive anything, so after subscribing the app shows a one-line code that Mike sends to the
+// desk Telegram bot (/push DP1.…). The code is the subscription encrypted with the app token
+// (PBKDF2-SHA256 210k + AES-GCM, AAD "desk:push"), so only this desk's app can register a phone.
+const pushOK = () => "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+let swReg = null, pushCode = localStorage.getItem("desk_push_code");
+async function registerSW() {
+  if (!("serviceWorker" in navigator)) return null;
+  try { swReg = await navigator.serviceWorker.register("sw.js", { scope: "./" }); } catch (e) { console.error(e); }
+  return swReg;
+}
+const b64u = b => btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const b64uDec = s => b64d(s.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4));
+async function makePushCode(sub, token) {
+  const j = sub.toJSON(), salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
+  const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(token), "PBKDF2", false, ["deriveKey"]);
+  const key = await crypto.subtle.deriveKey({ name: "PBKDF2", hash: "SHA-256", salt, iterations: 210000 },
+    base, { name: "AES-GCM", length: 256 }, false, ["encrypt"]);
+  const pt = new TextEncoder().encode(JSON.stringify({ e: j.endpoint, p: j.keys.p256dh, a: j.keys.auth }));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: new TextEncoder().encode("desk:push") }, key, pt));
+  const all = new Uint8Array(28 + ct.length); all.set(salt); all.set(iv, 16); all.set(ct, 28);
+  return "DP1." + b64u(all);
+}
+function alertsHtml() {
+  const q = (D && D.push && D.push.quiet) || "23:00-07:00";
+  if (!pushOK()) return `<b>Phone alerts</b><p class="sm mut">This browser can't receive alerts. On Android use Chrome and add the app to the Home screen.</p>`;
+  const perm = Notification.permission;
+  const head = `<div class="row"><b>Phone alerts</b><span class="sp"></span><span class="sm mut">${D && D.push ? D.push.devices + " device(s) registered" : ""}</span></div>`;
+  const quiet = `<p class="sm mut">Quiet hours ${esc(q)}: only stop-loss, desk-locked and market-danger alerts come through at night; the rest arrive in the morning.</p>`;
+  if (perm === "denied") return head + `<p class="sm red">Notifications are blocked for this site. Allow them in Chrome's site settings, then come back.</p>` + quiet;
+  if (pushCode) return head + `<p class="sm">Send this whole line to your desk bot in Telegram (one time per phone):</p>
+    <textarea id="pushCode" readonly rows="4" style="width:100%;background:var(--card2);color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:.5rem;font:12px ui-monospace,monospace">/push ${esc(pushCode)}</textarea>
+    <div class="row" style="gap:.4rem;margin-top:.4rem"><button class="btn" id="copyPush">Copy</button><button class="btn ghost" id="offPush">Turn off</button>
+    <span class="sm mut" id="copyMsg"></span></div>` + quiet;
+  return head + `<p class="sm mut">Get buy, stop-loss, take-profit and desk alerts on this phone.</p>
+    <button class="btn" id="onPush">Enable alerts</button> <span class="sm red" id="pushErr"></span>` + quiet;
+}
+function bindAlerts() {
+  const on = $("onPush"), copy = $("copyPush"), off = $("offPush");
+  if (on) on.onclick = enableAlerts;
+  if (copy) copy.onclick = async () => { try { await navigator.clipboard.writeText($("pushCode").value); $("copyMsg").textContent = "Copied"; }
+    catch (e) { $("pushCode").select(); $("copyMsg").textContent = "Select and copy"; } };
+  if (off) off.onclick = async () => { const r = swReg || await registerSW(); const s = r && await r.pushManager.getSubscription();
+    if (s) await s.unsubscribe(); localStorage.removeItem("desk_push_code"); pushCode = null; renderHome(); };
+}
+async function enableAlerts() {
+  const err = m => { const el = $("pushErr"); if (el) el.textContent = m; };
+  try {
+    if (!D || !D.push || !D.push.key) return err("The desk hasn't published its alert key yet.");
+    if (await Notification.requestPermission() !== "granted") return renderHome();
+    const reg = swReg || await registerSW(); if (!reg) return err("Could not start the alert worker.");
+    await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64uDec(D.push.key) });
+    pushCode = await makePushCode(sub, deskToken()); localStorage.setItem("desk_push_code", pushCode); renderHome();
+  } catch (e) { console.error(e); err("Could not enable alerts: " + e.message); }
+}
+
 async function refresh() {
   try {
     D = await load("desk");
@@ -392,7 +453,7 @@ async function refresh() {
 }
 
 if (!deskToken()) { $("lock").style.display = "block"; $("app").style.display = "none"; $("tabs").style.display = "none"; $("upd").textContent = ""; }
-else { show(view); refresh(); setInterval(refresh, 60000); setInterval(() => D && renderHeader(), 30000); }
+else { registerSW(); show(view); refresh(); setInterval(refresh, 60000); setInterval(() => D && renderHeader(), 30000); }
 </script>
 </body>
 </html>
