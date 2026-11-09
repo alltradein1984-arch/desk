@@ -7,7 +7,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' https: data:; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' https://api.dexscreener.com https://api.rugcheck.xyz https://api.geckoterminal.com; frame-src https://dexscreener.com https://www.dexscreener.com; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="theme-color" content="#07090c">
 <title>Desk</title>
-<!-- desk-build:17 chart-eager -->
+<!-- desk-build:18 buy-sell-fomo -->
 <script>
 // set the theme before first paint; Dark / Dim / Light (legacy auto/light migrated once)
 (function () { try {
@@ -351,10 +351,30 @@ function logo(c, extra = "") {
   const u = safeUrl(c.image);
   return `<div class="logo ${extra}">${u ? `<img src="${esc(u)}" alt="" referrerpolicy="no-referrer" onerror="this.parentNode.textContent='${initials(c.sym)}'">` : initials(c.sym)}</div>`;
 }
-// the link is used exactly as delivered in the feed (built by links.py on the box)
-function fomoBtn(link, ghost) {
+// the link is used exactly as delivered in the feed (built by links.py on the box). FOMO has no sell-only deep link — same coin page.
+const BUY_ALERT_KINDS = new Set(["buy", "follow", "follow_early"]);
+const SELL_ALERT_KINDS = new Set(["take_profit", "stop_loss", "sell_half_2x", "watch"]);
+function fomoBtn(link, ghost, label) {
   const u = safeUrl(link);
-  return u ? `<a class="btn${ghost ? " ghost" : ""}" href="${esc(u)}" target="_blank" rel="noopener noreferrer">Open on FOMO</a>` : "";
+  const text = label || "Open on FOMO";
+  return u ? `<a class="btn${ghost ? " ghost" : ""}" href="${esc(u)}" target="_blank" rel="noopener noreferrer">${text}</a>` : "";
+}
+function buyFomoBtn(link, ghost) { return fomoBtn(link, !!ghost, "Buy on FOMO"); }
+function sellFomoBtn(link, ghost) { return fomoBtn(link, !!ghost, "Sell on FOMO"); }
+/** Prominent Buy / Sell shortcut on alerts (not MC-ladder alone for Buy; Sell covers ladder + TP/SL + rug-ish watch). */
+function alertFomoBtn(a, ghost) {
+  if (!a || !a.url || a.kind === "auto_paper" || a.kind === "bedtime" || a.kind === "desk_locked" || a.kind === "desk_paused" || a.kind === "danger_on" || a.kind === "danger_off") return "";
+  const u = safeUrl(a.url);
+  if (!u || u.indexOf("/coin?address=") < 0) return "";  // FOMO coin page shape from feed; host never hardcoded
+  if (BUY_ALERT_KINDS.has(a.kind)) return buyFomoBtn(u, ghost);
+  if (SELL_ALERT_KINDS.has(a.kind)) return sellFomoBtn(u, ghost);
+  return fomoBtn(u, ghost);
+}
+/** Coin card: Buy + Sell side by side (same plain FOMO coin link). */
+function buySellFomoPair(link) {
+  const u = safeUrl(link);
+  if (!u) return "";
+  return `${buyFomoBtn(u, false)}${sellFomoBtn(u, true)}`;
 }
 // DexScreener chart: the feed's chart_url, used as given; only https://dexscreener.com/... is accepted
 function chartBtn(u) {
@@ -764,7 +784,7 @@ function renderAudit() {
         return `<div class="chk ${st}" style="animation-delay:${i * 45}ms"><div class="ic ic-${st}">${st === "ok" ? "✓" : st === "bad" ? "!" : "–"}</div>
           <div><div class="lab">${esc(r.label)}</div><div class="val">${esc(r.value)}</div></div></div>`; }).join("")}</div>
       <div class="verdict ${ok ? "v-ok" : "v-bad"}">${verdict}</div>
-      <div class="row" style="margin-top:.7rem;flex-wrap:wrap;gap:.4rem"><span class="row" style="gap:.4rem;flex-wrap:wrap">${fomoBtn(a.link, true)}${chartBtn(a.chart_url)}${holdersBtns(a.mint)}</span><span class="sp"></span><span class="sm mut">${aIdx + 1} / ${L.length}</span></div>
+      <div class="row" style="margin-top:.7rem;flex-wrap:wrap;gap:.4rem"><span class="row" style="gap:.4rem;flex-wrap:wrap">${buySellFomoPair(a.link)}${chartBtn(a.chart_url)}${holdersBtns(a.mint)}</span><span class="sp"></span><span class="sm mut">${aIdx + 1} / ${L.length}</span></div>
     </div>
     <div class="nav2"><button id="aPrev" aria-label="previous coin">‹</button>
       <div class="dots">${L.map((x, i) => `<i class="${i === aIdx ? "on" : ""} ${x.banner === "Cleared" ? "g" : "r"}" data-i="${i}"></i>`).join("")}</div>
@@ -888,7 +908,7 @@ function alertFeedHtml() {
         <b class="sm">${esc(a.sym || a.title || "?")}</b><span class="sp"></span><span class="sm mut">${tmAms(a.ts)}</span></div>
       <div class="sm mut">${esc(a.short || a.title || "")}${esc(mcLine)}</div>
       ${a.body && a.body !== a.short ? `<div class="sm mut" style="white-space:pre-line;margin-top:.15rem">${esc((a.body || "").split("\n").slice(0, 3).join(" · ").slice(0, 180))}</div>` : ""}
-      <div class="row" style="margin-top:.35rem;gap:.35rem;flex-wrap:wrap">${chartBtn(chart)}${holdersBtns(a.mint, true)}${a.url && a.kind !== "auto_paper" && a.kind !== "bedtime" ? fomoBtn(a.url, true) : ""}</div>
+      <div class="row" style="margin-top:.35rem;gap:.35rem;flex-wrap:wrap">${alertFomoBtn(a, !BUY_ALERT_KINDS.has(a.kind))}${chartBtn(chart)}${holdersBtns(a.mint, true)}</div>
     </div>`;
   }).join("");
 }
@@ -1271,7 +1291,7 @@ function renderCoin() {
     <div class="sm">Dev sold: ${c.dev_sold_pct != null ? esc((+c.dev_sold_pct).toFixed(0)) + "% of his launch bag" : "unknown"}${L.rugged ? ` · <b class="red">RugCheck marks it RUGGED</b>` : ""}</div>
     <div class="sm" style="margin-top:.3rem">${c.rug ? `Desk rug check: ${esc(c.rug.text)} · <span class="mut">${esc(c.rug.why || "")}</span>` : "Desk rug check: not run on this coin."}</div>
     <div class="sm${R && (R.mintAuth || R.freezeAuth || L.rugged) ? " red" : ""}">${esc(rcLine)}</div>
-    <div class="row" style="margin-top:.6rem;gap:.5rem;flex-wrap:wrap">${fomoBtn(flink)}${holdersBtns(m)}</div></div>
+    <div class="row" style="margin-top:.6rem;gap:.5rem;flex-wrap:wrap">${buySellFomoPair(flink)}${holdersBtns(m)}</div></div>
   <div class="card agcard"><b>PAPER entry / exit</b>
     <div class="sm mut" style="margin-top:.4rem">Desk's own price samples (not DexScreener):</div>${priceSvg(c.series, marks)}</div>
   <div class="card agcard"><b>Top holders</b>${top.length ? top.slice(0, 20).map((h, i) => { const lb = labels(h);
@@ -1355,7 +1375,7 @@ function renderAgents(keep) {
       ${A.alerts.map(a => `<div class="item ${isMint(a.mint) ? "tap" : ""}" data-coin="${esc(a.mint || "")}"><div class="row">${a.possible ? `<span class="stage st-held">Possible coin to invest in</span>` : `<span class="stage">${esc(a.kind.replace("_", " "))}</span>`}
         ${a.tier ? `<span class="stage st-watch">${esc(a.tier)}</span>` : ""}<span class="sp"></span><span class="sm mut">${agoS(a.ts)}</span></div>
         <div style="margin-top:.2rem"><b>${esc(a.title)}</b></div><div class="sm mut" style="white-space:pre-line">${esc(a.body)}</div>
-        <div class="row" style="margin-top:.35rem;gap:.35rem;flex-wrap:wrap"><span class="sp"></span>${a.url && a.kind !== "auto_paper" && a.kind !== "bedtime" ? fomoBtn(a.url, true) : ""}${holdersBtns(a.mint, true)}</div></div>`).join("") || `<p class="sm mut">No alerts yet.</p>`}</div>
+        <div class="row" style="margin-top:.35rem;gap:.35rem;flex-wrap:wrap"><span class="sp"></span>${alertFomoBtn(a, !BUY_ALERT_KINDS.has(a.kind))}${holdersBtns(a.mint, true)}</div></div>`).join("") || `<p class="sm mut">No alerts yet.</p>`}</div>
     <div class="card agcard"><b>Activity</b><ul class="plain" style="margin-top:.4rem">${A.activity.slice(0, 15).map(e => `<li><div class="row"><b class="sm">${esc(e.agent)}</b><span class="sm">${esc(e.text)}</span><span class="sp"></span><span class="sm mut">${agoS(e.ts)}</span></div>${e.why ? `<div class="sm mut">because ${esc(e.why)}</div>` : ""}</li>`).join("")}</ul></div>
     <div class="card agcard"><div class="row"><b>Closed PAPER trades</b><span class="sp"></span><span class="sm">win ${A.closed.length ? Math.round(wins / A.closed.length * 100) + "%" : "–"} of ${A.closed.length}</span></div>
       ${A.closed.map(p => `<div class="item tap" data-coin="${esc(p.mint)}"><div class="row"><b>${esc(p.sym || shortMint(p.mint))}</b><span class="stage">${p.book === "auto" ? "auto · " + esc(p.tier) : p.book === "manual" ? "yours (logged)" : "desk"}</span><span class="sp"></span><b class="${cls(p.pnl)}">${usd(p.pnl, 1)}</b></div>
@@ -1458,7 +1478,7 @@ let swReg = null, pushCode = localStorage.getItem("desk_push_code");
 async function registerSW() {
   if (!("serviceWorker" in navigator)) return null;
   try {
-    swReg = await navigator.serviceWorker.register("sw.js?v=17", { scope: "./" });
+    swReg = await navigator.serviceWorker.register("sw.js?v=18", { scope: "./" });
     if (swReg && swReg.update) swReg.update().catch(() => {});
     // New SW takes control → reload once so the PWA drops a blank half-cached shell.
     let refreshing = false;
