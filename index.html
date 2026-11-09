@@ -1384,12 +1384,15 @@ function alertRowHtml(a, seen) {
   const lvl = a.level && MC_LEVELS.includes(a.level) ? `<span class="stage st-watch">${fmtMc(a.level)}</span>` : (a.tier ? `<span class="stage st-watch">${esc(a.tier)}</span>` : "");
   const mc = a.mc_at != null ? a.mc_at : a.mc;
   const mcLine = mc ? ` · MC ${fmtMc(mc)}` : "";
+  const title = scrubSafe(a.sym || a.title || "?");
+  const short = scrubSafe(a.short || a.title || "");
+  const body = scrubSafe((a.body || "").split("\n").slice(0, 3).join(" · ").slice(0, 180));
   return `<div class="lb-row alert-item${unread ? " unread" : ""} ${isMint(a.mint) ? "tap" : ""}" data-coin="${esc(a.mint || "")}">
     <div class="row">${num != null ? `<span class="alert-n">#${esc(num)}</span>` : ""}<span class="stage">${esc((a.kind || "").replace(/_/g, " "))}</span>${lvl}
-      <b class="sm">${esc(a.sym || a.title || "?")}</b><span class="sp"></span><span class="sm mut">${tmAms(a.ts)}</span></div>
-    <div class="sm mut">${esc(a.short || a.title || "")}${esc(mcLine)}${a.price_at != null ? " · px " + esc(String(a.price_at)) : ""}</div>
+      <b class="sm">${esc(title)}</b><span class="sp"></span><span class="sm mut">${tmAms(a.ts)}</span></div>
+    <div class="sm mut">${esc(short)}${esc(mcLine)}${a.price_at != null ? " · px " + esc(String(a.price_at)) : ""}</div>
     <div class="sm" style="margin-top:.15rem">${lbDeltaHtml(a)}</div>
-    ${a.body && a.body !== a.short ? `<div class="sm mut" style="white-space:pre-line;margin-top:.15rem">${esc((a.body || "").split("\n").slice(0, 3).join(" · ").slice(0, 180))}</div>` : ""}
+    ${body && body !== short ? `<div class="sm mut" style="white-space:pre-line;margin-top:.15rem">${esc(body)}</div>` : ""}
     <div class="row" style="margin-top:.35rem;gap:.35rem;flex-wrap:wrap" onclick="event.stopPropagation()">${alertFomoBtn(a, !BUY_ALERT_KINDS.has(a.kind))}${chartBtn(chart)}${holdersBtns(a.mint, true)}</div>
   </div>`;
 }
