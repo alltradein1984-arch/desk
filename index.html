@@ -23,9 +23,13 @@
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.4 -apple-system,system-ui,Segoe UI,Roboto,sans-serif;-webkit-tap-highlight-color:transparent}
 body{padding-bottom:calc(68px + env(safe-area-inset-bottom))}
-header{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:.6rem;padding:.7rem 1rem;background:rgba(7,9,12,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
-header h1{margin:0;font-size:1.1rem;letter-spacing:.05em}
-header .upd{margin-left:auto;color:var(--mut);font-size:.8rem;text-align:right}
+header{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:.35rem;padding:.55rem .65rem;background:rgba(7,9,12,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);flex-wrap:nowrap}
+header h1{margin:0;font-size:1rem;letter-spacing:.05em;flex:none}
+header .upd{margin-left:auto;color:var(--mut);font-size:.68rem;text-align:right;line-height:1.15;flex:none;max-width:4.6rem}
+.hdr-coin{display:inline-flex;gap:.22rem;align-items:center;flex:none}
+.hdr-coin[hidden]{display:none!important}
+.hdr-btn{font-size:.65rem;font-weight:700;padding:.16rem .4rem;border-radius:8px;border:1px solid var(--line);color:var(--txt);text-decoration:none;background:var(--card2);white-space:nowrap;line-height:1.2}
+.hdr-btn[aria-disabled="true"]{opacity:.35;pointer-events:none}
 .badge{font-size:.7rem;font-weight:700;padding:.15rem .5rem;border-radius:99px;letter-spacing:.06em}
 .b-paper{background:#2a2410;color:var(--amb);border:1px solid #5a4614}.b-live{background:#2a1015;color:var(--red);border:1px solid #5a1a24}
 main{max-width:1280px;margin:0 auto;padding:1rem}
@@ -145,6 +149,10 @@ html[data-theme="light"] .btn{color:#fff}html[data-theme="light"] .btn.ghost{col
 <body>
 <header>
   <h1>DESK</h1><span id="mode" class="badge b-paper">…</span>
+  <span id="hdrCoin" class="hdr-coin" hidden>
+    <a class="hdr-btn" id="hdrWallets" target="_blank" rel="noopener noreferrer">Wallets</a>
+    <a class="hdr-btn" id="hdrBubble" target="_blank" rel="noopener noreferrer">Bubble</a>
+  </span>
   <div class="upd" id="upd">Loading…</div>
   <button id="theme" title="Theme: Auto = light 22:00-07:00, dark in the day">Auto</button>
 </header>
@@ -280,11 +288,34 @@ const STALE_MIN = 20;
 let D = null, view = localStorage.getItem("desk_view") || "home", aIdx = 0;
 
 // ---------- screens ----------
+const agoShort = ts => { const m = Math.max(0, (Date.now() / 1000 - ts) / 60);
+  return m < 1 ? "now" : m < 60 ? Math.round(m) + "m" : m < 2880 ? (m / 60).toFixed(1) + "h" : Math.round(m / 1440) + "d"; };
+function currentMint() {
+  // Auditor: the flipped card. Coin page: the selected mint. Elsewhere: none.
+  if (view === "audit" && D) { const L = auditList(), a = L[aIdx]; return a && a.mint ? a.mint : null; }
+  if (view === "coin" && typeof coinSel !== "undefined" && coinSel) return coinSel;
+  return null;
+}
 function renderHeader() {
+  if (!D) return;
   const s = D.state, mode = s.mode === "LIVE" ? "LIVE" : "PAPER";
   $("mode").textContent = mode; $("mode").className = "badge " + (mode === "LIVE" ? "b-live" : "b-paper");
   const old = (Date.now() / 1000 - D.ts) / 60 > STALE_MIN;
-  $("upd").innerHTML = `<span class="${old ? "red" : ""}">Updated ${ago(D.ts)}</span>`;
+  $("upd").innerHTML = `<span class="${old ? "red" : ""}">Upd ${agoShort(D.ts)}</span>`;
+  const m = currentMint(), box = $("hdrCoin"), w = $("hdrWallets"), b = $("hdrBubble");
+  const ok = typeof m === "string" && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(m);
+  if (!box || !w || !b) return;
+  if (ok) {
+    box.hidden = false;
+    w.href = "https://solscan.io/token/" + m + "#holders";
+    b.href = "https://app.bubblemaps.io/sol/token/" + m;
+    w.setAttribute("aria-disabled", "false"); b.setAttribute("aria-disabled", "false");
+    w.title = "Solscan holders for this coin"; b.title = "Bubblemaps for this coin";
+  } else {
+    box.hidden = true;
+    w.removeAttribute("href"); b.removeAttribute("href");
+    w.setAttribute("aria-disabled", "true"); b.setAttribute("aria-disabled", "true");
+  }
 }
 
 function morningHtml() {
@@ -398,6 +429,7 @@ function renderAudit() {
   $("aNext").onclick = () => { aIdx = (aIdx + 1) % L.length; renderAudit(); };
   document.querySelectorAll(".dots i").forEach(d => d.onclick = () => { aIdx = +d.dataset.i; renderAudit(); });
   renderSplitTrades();
+  renderHeader();
 }
 function renderSplitTrades() { $("splitTrades").innerHTML = tradesHtml(true); }
 
@@ -865,6 +897,7 @@ function renderCoin() {
     <div class="sm mut">PAPER $${p.size} · entry ${px(p.entry)} · ${p.closed ? "closed " + tm(p.closed) + " · " + esc(p.reason || "") : "open since " + tm(p.opened)}</div></div>`; }).join("") || `<p class="sm mut">No PAPER position in this coin.</p>`}</div>`;
   el.querySelectorAll("[data-pick]").forEach(n => n.onclick = () => { coinSel = n.dataset.pick; renderCoin(); fetchHolders(coinSel); fetchLive(); });
   $("coinBack").onclick = () => show(coinFrom && coinFrom !== "coin" ? coinFrom : "agents");
+  renderHeader();
 }
 function openCoin(m) { coinFrom = view; coinSel = m; show("coin"); fetchHolders(m); fetchLive(); }
 function pnlCards(A) {
@@ -1010,6 +1043,7 @@ function show(v) {
   document.querySelectorAll(".view").forEach(s => s.classList.toggle("on", s.id === "v-" + v));
   document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.v === v));
   if (D) ({ home: renderHome, audit: renderAudit, coins: renderCoins, trades: renderTrades, whales: renderWhales, events: renderEvents, agents: renderAgents, race: renderRace, coin: renderCoin })[v]();
+  if (D) renderHeader();
   window.scrollTo(0, 0);
 }
 document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => show(b.dataset.v));
