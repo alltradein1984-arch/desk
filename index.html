@@ -627,6 +627,88 @@ function tradersChart(trs) {
       <span class="sm tr-v">${agSort === "pnl" ? kusd(t.pnl) : t.consistency ?? "–"}</span></div>`;
   }).join("");
 }
+// ---- Trader bubble-map / linked-wallet check (RugCheck insiders/graph, same source as auditor.linked_wallets) ----
+const LINK_CACHE = {};           // mint -> { ts, graph, supply, err }
+const LINK_TTL_MS = 5 * 60 * 1000;
+const LINK_INFLIGHT = {};
+function walletCluster(graph, wallet, supply, minSize) {
+  // Mirrors agents/auditor.py wallet_cluster. Never guesses.
+  if (!wallet) return null;
+  const nets = (graph && graph.response) ? graph.response : (graph || []);
+  let best = null;
+  for (const n of nets) {
+    const nodes = n.nodes || [];
+    const ids = new Set(nodes.map(x => x.id).filter(Boolean));
+    if (!ids.has(wallet) || ids.size < (minSize || 2)) continue;
+    const others = ids.size - 1;
+    const held = nodes.reduce((s, x) => s + (x.holdings || 0), 0);
+    const held_pct = (supply && held) ? Math.min(100, held / supply * 100) : null;
+    const cand = { others, size: ids.size, held_pct: held_pct == null ? null : Math.round(held_pct * 10) / 10 };
+    if (!best || cand.others > best.others) best = cand;
+  }
+  return best;
+}
+function walletClusterLine(info) {
+  if (info === "unknown") return "unknown";
+  if (!info) return "Not linked";
+  const who = `Linked to ${info.others} other wallet${info.others === 1 ? "" : "s"} in this coin`;
+  return info.held_pct != null ? `${who}, holding ${info.held_pct.toFixed(1)}% together` : `${who}, % held unknown`;
+}
+function linkLineFromCache(mint, wallet) {
+  const c = LINK_CACHE[mint];
+  if (!c) return "checking…";
+  if (c.err) return "unknown";
+  if (c.graph == null) return "checking…";
+  return walletClusterLine(walletCluster(c.graph, wallet, c.supply, 2));
+}
+async function fetchMintLink(mint) {
+  if (!isMint(mint)) return null;
+  const now = Date.now(), hit = LINK_CACHE[mint];
+  if (hit && now - hit.ts < LINK_TTL_MS && (hit.graph != null || hit.err)) return hit;
+  if (LINK_INFLIGHT[mint]) return LINK_INFLIGHT[mint];
+  LINK_INFLIGHT[mint] = (async () => {
+    try {
+      // Prefer supply already loaded by the coin screen; otherwise fetch report + graph.
+      let supply = (LIVE[mint] && LIVE[mint].rc && LIVE[mint].rc.supply) || null;
+      const [gRes, rRes] = await Promise.all([
+        fetch(`https://api.rugcheck.xyz/v1/tokens/${mint}/insiders/graph`, { cache: "no-store", referrerPolicy: "no-referrer" }),
+        supply != null ? Promise.resolve(null) : fetch(`https://api.rugcheck.xyz/v1/tokens/${mint}/report`, { cache: "no-store", referrerPolicy: "no-referrer" })
+      ]);
+      if (!gRes.ok) throw new Error("graph " + gRes.status);
+      const graph = await gRes.json();
+      if (rRes) {
+        if (!rRes.ok) throw new Error("report " + rRes.status);
+        const j = await rRes.json();
+        supply = (j.token || {}).supply ?? null;
+        // Seed LIVE so the coin screen can reuse this report without a second hit.
+        if (!LIVE[mint] || !LIVE[mint].rcTs) {
+          const top = (j.topHolders || []).slice(0, 20);
+          const tk = j.token || {};
+          LIVE[mint] = Object.assign(LIVE[mint] || {}, { holders: Number.isFinite(j.totalHolders) ? j.totalHolders : null, rugged: !!j.rugged, rcTs: Date.now() / 1000,
+            rc: { total: Number.isFinite(j.totalHolders) ? j.totalHolders : null, top, top10: null, markets: j.markets || [], known: j.knownAccounts || {},
+                  nets: j.insiderNetworks || [], creator: j.creator, creatorBalance: j.creatorBalance, supply: tk.supply, decimals: tk.decimals } });
+        }
+      }
+      LINK_CACHE[mint] = { ts: Date.now(), graph, supply, err: false };
+    } catch (e) {
+      LINK_CACHE[mint] = { ts: Date.now(), graph: null, supply: null, err: true };
+    } finally { delete LINK_INFLIGHT[mint]; }
+    return LINK_CACHE[mint];
+  })();
+  return LINK_INFLIGHT[mint];
+}
+async function fillTraderLinks(t) {
+  if (!t || !t.wallet) return;
+  const mints = [...new Set((t.recent || []).map(r => r.mint).filter(isMint))];
+  // Sequential: avoid bursting RugCheck when a trader has several coins.
+  for (const m of mints) {
+    await fetchMintLink(m);
+    document.querySelectorAll(`[data-twlink="${CSS.escape(m)}"][data-tww="${CSS.escape(t.wallet)}"]`).forEach(el => {
+      el.textContent = linkLineFromCache(m, t.wallet);
+    });
+  }
+}
+
 function traderView(t) {
   const mx = Math.max(...t.months.map(m => Math.abs(m.pnl || 0)), 1);
   const bars = t.months.map(m => `<div class="mb"><div class="mbv"><span style="height:${Math.max(2, Math.abs(m.pnl || 0) / mx * 70)}px;background:${(m.pnl || 0) >= 0 ? "#2fd27a" : "#ff5468"}"></span></div>
@@ -642,8 +724,15 @@ function traderView(t) {
     <div class="sm" style="margin-top:.5rem">Score ${t.score != null ? Math.round(t.score) : "–"} · consistency ${t.consistency ?? "–"} · ${esc(t.label || "–")} · ${t.followed ? `followed #${t.rank}` : "not followed"}</div>
     <div class="sm mut">${esc(t.boards.join(" · "))}</div></div>
   <div class="card agcard"><b>Wins / losses per month</b><div class="mbars">${bars || `<p class="sm mut">No monthly history for this wallet.</p>`}</div></div>
-  <div class="card agcard"><b>Recent buys / sells</b>${t.recent.map(r => `<div class="row sm" style="margin-top:.3rem"><span class="stage ${r.side === "buy" ? "st-held" : "st-rejected"}">${esc(r.side)}</span>
-    <span>${esc(r.sym || shortMint(r.mint))} · $${(r.usd || 0).toLocaleString()}</span><span class="sp"></span><span class="mut">${tm(r.ts)}</span></div>`).join("") || `<p class="sm mut">No trades seen by the follow poller yet.</p>`}</div>
+  <div class="card agcard"><b>Recent buys / sells</b>${t.recent.map(r => {
+    const m = r.mint, bm = isMint(m) ? ("https://app.bubblemaps.io/sol/token/" + m) : "";
+    const cached = isMint(m) ? linkLineFromCache(m, t.wallet) : "unknown";
+    return `<div class="tr-trade" style="margin-top:.5rem"><div class="row sm"><span class="stage ${r.side === "buy" ? "st-held" : "st-rejected"}">${esc(r.side)}</span>
+      <span>${esc(r.sym || shortMint(m))} · $${(r.usd || 0).toLocaleString()}</span><span class="sp"></span>
+      ${bm ? `<a class="btn ghost" style="padding:.2rem .55rem;font-size:.75rem" href="${esc(bm)}" target="_blank" rel="noopener noreferrer">Bubblemaps</a>` : ""}
+      <span class="mut">${tm(r.ts)}</span></div>
+      <div class="sm mut" data-twlink="${esc(m || "")}" data-tww="${esc(t.wallet)}">${esc(cached)}</div></div>`;
+  }).join("") || `<p class="sm mut">No trades seen by the follow poller yet.</p>`}</div>
   <div class="card agcard"><b>Coins they pile into</b>${t.piles.map(c => `<div class="row sm" style="margin-top:.3rem"><b>${esc(c.sym || shortMint(c.mint))}</b><span class="sp"></span>$${(c.usd || 0).toLocaleString()} · ${c.n} buys</div>`).join("") || `<p class="sm mut">None seen yet.</p>`}
     <div class="sm" style="margin-top:.6rem"><b>Alert tiers they helped trigger:</b> ${con.length ? con.map(([k, n]) => `${esc(k)} ×${n}`).join(" · ") : "none yet"}</div></div>`;
 }
@@ -847,10 +936,14 @@ function renderAgents(keep) {
 }
 function wireAgents(el) {
   el.querySelectorAll("[data-trader]").forEach(n => n.onclick = () => { agSel = { t: "trader", id: n.dataset.trader }; show("agents"); });
-  el.querySelectorAll("[data-coin]").forEach(n => { if (isMint(n.dataset.coin)) n.onclick = ev => { if (ev.target.closest("a")) return; openCoin(n.dataset.coin); }; });
+  el.querySelectorAll("[data-coin]").forEach(n => { if (isMint(n.dataset.coin)) n.onclick = ev => { if (ev.target.closest("a,button")) return; openCoin(n.dataset.coin); }; });
   el.querySelectorAll("[data-sort]").forEach(n => n.onclick = () => { agSort = n.dataset.sort; renderAgents(true); });
   const b = $("agBack"); if (b) b.onclick = () => { const back = agSel && agSel.from; agSel = null; show(back || "agents"); };
   const c = $("agCopy"); if (c) c.onclick = () => { navigator.clipboard && navigator.clipboard.writeText(c.dataset.w).then(() => c.textContent = "Copied ✓"); };
+  if (agSel && agSel.t === "trader") {
+    const t = (D.agentsx || {}).traders && D.agentsx.traders.find(x => x.wallet === agSel.id);
+    if (t) fillTraderLinks(t);
+  }
 }
 function tickUpd() {
   const cu = $("coinUpd"); if (cu && coinSel) { const L = LIVE[coinSel] || {}; cu.textContent = `price ${L.ts ? agoS(L.ts) : "loading…"} · holders ${L.rcTs ? agoS(L.rcTs) : "loading…"} · data ${agoS((D.agentsx || {}).ts || D.ts)}`; }
