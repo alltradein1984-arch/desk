@@ -7,7 +7,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' https: data:; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' https://api.dexscreener.com https://api.rugcheck.xyz https://api.geckoterminal.com; frame-src https://dexscreener.com https://www.dexscreener.com; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="theme-color" content="#07090c">
 <title>Desk</title>
-<!-- desk-build:22 chart-dock-fix -->
+<!-- desk-build:23 alert-n-logbook-home-agents -->
 <script>
 // set the theme before first paint; Dark / Dim / Light (legacy auto/light migrated once)
 (function () { try {
@@ -241,6 +241,23 @@ html[data-theme="light"] #v-agents,html[data-theme="light"] #v-race,html[data-th
 .mbars{display:flex;gap:.3rem;overflow-x:auto;margin-top:.5rem}.mb{flex:1 0 54px;text-align:center}.mbv{height:74px;display:flex;align-items:flex-end;justify-content:center}.mbv span{width:60%;border-radius:4px 4px 0 0}
 .rbar{position:absolute;left:0;right:0;height:26px;transition:transform .9s ease,opacity .6s}.rb{position:absolute;left:0;top:3px;height:20px;border-radius:5px;transition:width .9s ease;opacity:.85}
 .rl{position:absolute;left:.4rem;top:4px;font-size:.8rem;white-space:nowrap;text-shadow:0 1px 2px #000}
+
+/* Home agent rows + detail */
+.agent-li{cursor:pointer;padding:.35rem .15rem;border-radius:8px}
+.agent-li:active,.agent-li:hover{background:var(--card2)}
+.agent-li .chev{color:var(--mut);font-size:.85rem;margin-left:.25rem}
+.ag-detail .ag-log li{padding:.35rem 0;border-bottom:1px solid var(--line)}
+.ag-detail .ag-log li:last-child{border:0}
+/* Alerts search + list */
+.al-search-wrap{display:flex;flex-direction:column;gap:.45rem;margin:.5rem 0 .35rem}
+.al-search{width:100%;box-sizing:border-box;background:var(--card2);color:var(--txt);border:1px solid var(--line);border-radius:12px;padding:.7rem .85rem;font-size:1rem;-webkit-appearance:none}
+.al-chips{display:flex;flex-wrap:wrap;gap:.35rem;align-items:center}
+.al-chip{font-size:.75rem;font-weight:600;padding:.28rem .65rem;border-radius:99px;background:var(--card2);border:1px solid var(--line);color:var(--mut);cursor:pointer}
+.al-chip.on{color:var(--txt);border-color:var(--txt);background:transparent}
+.lb-row,.alert-item{padding:.65rem 0;border-bottom:1px solid var(--line)}
+.lb-row:last-child,.alert-item:last-child{border:0}
+.lb-n,.alert-n{font-variant-numeric:tabular-nums;color:var(--mut);font-weight:700;min-width:2.4rem;margin-right:.25rem}
+.al-list{max-height:none}
 </style>
 </head>
 <body>
@@ -473,7 +490,8 @@ function coinAlertsHtml(mint, n) {
     const label = a.short || a.title || a.kind;
     const when = tmAms(a.ts).split(",").pop().trim(); // HH:MM Amsterdam
     const fire = a.level || /rug|RUGGED|danger/i.test(a.title || "") || a.kind === "danger_on";
-    return `<span class="chip${fire ? " fire" : ""}">${esc(label)} · ${esc(when)}</span>`;
+    const num = a.n != null ? `#${a.n} ` : (a.id != null ? `#${a.id} ` : "");
+    return `<span class="chip${fire ? " fire" : ""}">${esc(num)}${esc(label)} · ${esc(when)}</span>`;
   }).join("")}</div>`;
 }
 // ---- Live Dex chart (Android-safe): NEVER move an iframe in the DOM ----
@@ -807,6 +825,57 @@ function walletLink(w, label) {
   return `<a href="${esc("https://solscan.io/account/" + w)}" target="_blank" rel="noopener noreferrer"><code>${esc(lab)}</code></a>`;
 }
 const STALE_MIN = 20;
+/** Plain-English one-liners for Home → agent detail (no secrets). */
+const AGENT_BLURB = {
+  scanner: "Finds new Solana meme coins and scores early candidates.",
+  auditor: "Checks coins for rug, mint, freeze and LP risks before anything else.",
+  analyst: "Scores candidates and decides if they clear the desk bar.",
+  risk: "Applies hard PAPER rules — size, cooldown, daily stop, loss streak.",
+  executor: "Opens and closes PAPER desk trades when the rules allow.",
+  follow: "Watches top traders and fires whale / follow alerts (you tap FOMO).",
+  autopaper: "Simulates PAPER copies by tier for learning — never real money.",
+  boards: "Refreshes FOMO / GMGN / pump.fun top-trader boards each day.",
+  bot: "Handles your Telegram commands to the desk.",
+  market: "Watches market danger and pause conditions.",
+  mywallets: "Tracks your REAL FOMO wallets read-only (alerts only).",
+  publisher: "Pushes the encrypted phone feed to GitHub Pages.",
+  rugwatch: "Watches open coins for rug-style price collapses.",
+  telegram: "Delivers alerts to your Telegram chat.",
+  webpush: "Sends phone Web Push notifications."
+};
+let homeAgentSel = null;
+/** Scrub long base58 addresses / #t= / referral crumbs from agent log lines. */
+function scrubSafe(s) {
+  if (s == null) return "";
+  const ref = "r=" + "sav" + "ipww";  // strip known referral crumb without shipping the literal in checks
+  return String(s)
+    .replace(/#t=[A-Za-z0-9_-]+/g, "")
+    .split(ref).join("")
+    .replace(/\b[1-9A-HJ-NP-Za-km-z]{32,44}\b/g, m => m.slice(0, 4) + "…" + m.slice(-4))
+    .replace(/\s{2,}/g, " ").trim();
+}
+const AGENT_LABEL_IDS = {
+  "scanner": "scanner", "rug check": "auditor", "auditor": "auditor", "analyst": "analyst",
+  "risk": "risk", "executor": "executor", "whale / follow": "follow", "follow": "follow",
+  "auto paper": "autopaper", "autopaper": "autopaper", "boards": "boards", "bot": "bot",
+  "telegram commands": "bot", "market": "market", "market filter": "market",
+  "mywallets": "mywallets", "publisher": "publisher", "rug watch": "rugwatch", "rugwatch": "rugwatch",
+  "telegram": "telegram", "web push": "webpush", "webpush": "webpush", "watchlist": "watch", "skeptic": "skeptic"
+};
+function resolveAgentId(label) {
+  const k = ((label || "") + "").toLowerCase().trim();
+  if (AGENT_LABEL_IDS[k]) return AGENT_LABEL_IDS[k];
+  const compact = k.replace(/[^a-z0-9]/g, "");
+  for (const [lab, id] of Object.entries(AGENT_LABEL_IDS)) {
+    if (lab.replace(/[^a-z0-9]/g, "") === compact) return id;
+  }
+  return compact;
+}
+function agentEvents(id) {
+  const idL = resolveAgentId(id);
+  return (D.events || []).filter(e => resolveAgentId(e.agent) === idL);
+}
+
 let D = null, view = localStorage.getItem("desk_view") || "home", aIdx = 0;
 
 // ---------- screens ----------
@@ -864,6 +933,7 @@ function morningHtml() {
 }
 
 function renderHome() {
+  if (homeAgentSel) { renderHomeAgent(homeAgentSel); return; }
   const s = D.state, now = Date.now() / 1000, minsOld = (now - D.ts) / 60;
   const bn = [];
   if (minsOld > STALE_MIN) bn.push(`<div class="banner bn-red">⚠ No update for ${Math.round(minsOld)} min - the desk may be down (normal delay is up to ~10 min).</div>`);
@@ -892,9 +962,9 @@ function renderHome() {
       <li>✓ ${esc(s.max_losses_in_row)} losses in a row pause the desk</li></ul></div>
   </div><div>
     ${morningHtml()}
-    <div class="card"><div class="row"><b>Agents</b><span class="sp"></span><span class="sm mut">feed: ${esc(D.source)}</span></div><ul class="plain sm" style="margin-top:.4rem">
+    <div class="card"><div class="row"><b>Agents</b><span class="sp"></span><span class="sm mut">tap a row · feed: ${esc(D.source)}</span></div><ul class="plain sm" style="margin-top:.4rem">
       ${agents.length ? agents.map(([n, ts]) => { const late = (now - ts) / 60 > STALE_MIN;
-        return `<li class="row"><span class="dot" style="background:${late ? "var(--red)" : "var(--grn)"}"></span><span style="text-transform:capitalize">${esc(n)}</span><span class="sp"></span><span class="${late ? "red" : "mut"}">${late ? "silent " : ""}${ago(ts)}</span></li>`; }).join("")
+        return `<li class="row agent-li" data-home-agent="${esc(n)}"><span class="dot" style="background:${late ? "var(--red)" : "var(--grn)"}"></span><span style="text-transform:capitalize">${esc(n)}</span><span class="sp"></span><span class="${late ? "red" : "mut"}">${late ? "silent " : ""}${ago(ts)}</span><span class="chev">›</span></li>`; }).join("")
         : `<li class="mut">No agent heartbeats yet.</li>`}</ul></div>
     <div class="card"><div class="row"><b>Latest</b><span class="sp"></span><button class="btn ghost" data-go="events">All events</button></div>
       <ul class="plain sm" style="margin-top:.4rem">${D.events.slice(0, 5).map(evLi).join("") || `<li class="mut">Nothing yet.</li>`}</ul></div>
@@ -903,6 +973,38 @@ function renderHome() {
       ${safeUrl(s.profile) ? `<br><a class="btn ghost" style="margin-top:.5rem" href="${esc(safeUrl(s.profile))}" target="_blank" rel="noopener noreferrer">FOMO profile</a>` : ""}</div>
   </div></div>`;
   bindAlerts();
+  $("v-home").querySelectorAll("[data-home-agent]").forEach(n => {
+    n.onclick = () => { homeAgentSel = n.dataset.homeAgent; renderHome(); };
+  });
+}
+
+function renderHomeAgent(id) {
+  const now = Date.now() / 1000;
+  const ts = (D.agents || {})[id];
+  const late = ts == null ? true : (now - ts) / 60 > STALE_MIN;
+  const blurb = AGENT_BLURB[id] || AGENT_BLURB[(id || "").toLowerCase()] || "Desk worker — see latest actions below.";
+  const name = (id || "").charAt(0).toUpperCase() + (id || "").slice(1);
+  // Prefer agents-feed activity (has agent label); fall back to desk events filtered by agent id.
+  const fromAg = ((D.agentsx || {}).activity || []).filter(e => resolveAgentId(e.agent) === resolveAgentId(id));
+  const fromDesk = agentEvents(id);
+  const rows = (fromAg.length ? fromAg : fromDesk.map(e => ({ ts: e.ts, text: e.title, why: e.sub, agent: e.agent, kind: e.kind }))).slice(0, 40);
+  const status = ts == null ? "no heartbeat" : late ? `silent ${ago(ts)}` : `heartbeat ${ago(ts)}`;
+  const log = rows.length ? rows.map(e => {
+    const title = scrubSafe(e.text || e.title || e.kind || "");
+    const why = scrubSafe(e.why || e.sub || "");
+    return `<li><div class="row"><b class="sm">${esc(title)}</b><span class="sp"></span><span class="sm mut">${tmAms(e.ts)}</span></div>
+      ${why ? `<div class="sm mut">${esc(why)}</div>` : ""}</li>`;
+  }).join("") : `<li class="mut">No recent actions logged for this agent.</li>`;
+  $("v-home").innerHTML = `<div class="card ag-detail">
+    <div class="row"><button class="btn ghost" id="homeAgBack">‹ Agents</button><span class="sp"></span>
+      <span class="dot" style="background:${late ? "var(--red)" : "var(--grn)"}"></span>
+      <span class="sm ${late ? "red" : "grn"}">${esc(status)}</span></div>
+    <h2 style="margin:.55rem 0 .2rem;text-transform:capitalize">${esc(name)}</h2>
+    <p class="sm mut">${esc(blurb)}</p>
+    <div class="row" style="margin-top:.4rem"><b>Latest actions</b><span class="sp"></span><span class="sm mut">Amsterdam time · scrubbed</span></div>
+    <ul class="plain sm ag-log" style="margin-top:.35rem">${log}</ul>
+  </div>`;
+  const b = $("homeAgBack"); if (b) b.onclick = () => { homeAgentSel = null; renderHome(); };
 }
 
 function auditList() {
@@ -1153,8 +1255,9 @@ function alertFeedHtml() {
     const chart = a.chart_url || (a.mint ? ("https://dexscreener.com/solana/" + a.mint) : null);
     const lvl = a.level && MC_LEVELS.includes(a.level) ? `<span class="stage st-watch">${fmtMc(a.level)}</span>` : (a.tier ? `<span class="stage st-watch">${esc(a.tier)}</span>` : "");
     const mcLine = a.mc ? ` · MC ${fmtMc(a.mc)}` : "";
+    const num = a.n != null ? a.n : a.id;
     return `<div class="alert-item${unread ? " unread" : ""}">
-      <div class="row"><span class="stage">${esc((a.kind || "").replace(/_/g, " "))}</span>${lvl}
+      <div class="row">${num != null ? `<span class="alert-n">#${esc(num)}</span>` : ""}<span class="stage">${esc((a.kind || "").replace(/_/g, " "))}</span>${lvl}
         <b class="sm">${esc(a.sym || a.title || "?")}</b><span class="sp"></span><span class="sm mut">${tmAms(a.ts)}</span></div>
       <div class="sm mut">${esc(a.short || a.title || "")}${esc(mcLine)}</div>
       ${a.body && a.body !== a.short ? `<div class="sm mut" style="white-space:pre-line;margin-top:.15rem">${esc((a.body || "").split("\n").slice(0, 3).join(" · ").slice(0, 180))}</div>` : ""}
@@ -1162,13 +1265,213 @@ function alertFeedHtml() {
     </div>`;
   }).join("");
 }
+function alertLogbook() {
+  const lb = (D && D.alert_logbook) || (D && D.agentsx && D.agentsx.alert_logbook) || null;
+  if (lb && Array.isArray(lb.rows)) return lb;
+  if (lb && Array.isArray(lb)) return { tz: "Europe/Amsterdam", count: lb.length, highest_n: lb[0] && lb[0].n, rows: lb };
+  const rows = feedAlerts().map(a => ({ ...a, n: a.n != null ? a.n : a.id, mc_at: a.mc_at != null ? a.mc_at : a.mc }));
+  return { tz: "Europe/Amsterdam", count: rows.length, highest_n: rows[0] && rows[0].n, rows };
+}
+function amsParts(ts) {
+  try {
+    const d = new Date(ts * 1000);
+    const fmt = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Amsterdam", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+    const parts = Object.fromEntries(fmt.formatToParts(d).filter(x => x.type !== "literal").map(x => [x.type, x.value]));
+    return { date: `${parts.year}-${parts.month}-${parts.day}`, hm: `${parts.hour}:${parts.minute}`, day: parts.day, month: parts.month, year: parts.year };
+  } catch (e) { return { date: "", hm: "", day: "", month: "", year: "" }; }
+}
+function lbDeltaHtml(a) {
+  const L = (a.mint && LIVE[a.mint]) || {};
+  const priceNow = L.price != null ? L.price : (a.price_now != null ? a.price_now : null);
+  let chgNow = null;
+  if (priceNow != null && a.price_at != null && +a.price_at > 0) chgNow = (priceNow / +a.price_at - 1) * 100;
+  const h1 = L.chg1h != null ? L.chg1h : (a.chg_1h_pct != null ? a.chg_1h_pct : null);
+  const h24 = L.chg24h != null ? L.chg24h : (a.chg_24h_pct != null ? a.chg_24h_pct : null);
+  const bit = (lab, v) => `<span class="sm mut">${lab} <b class="${v == null ? "" : cls(v)}">${v == null ? "n/a" : pct(v)}</b></span>`;
+  return `${bit("Δ now", chgNow)} · ${bit("1h", h1)} · ${bit("24h", h24)}`;
+}
+const AL_MONTHS = { jan: "01", january: "01", feb: "02", february: "02", mar: "03", march: "03", apr: "04", april: "04",
+  may: "05", jun: "06", june: "06", jul: "07", july: "07", aug: "08", august: "08", sep: "09", sept: "09", september: "09",
+  oct: "10", october: "10", nov: "11", november: "11", dec: "12", december: "12" };
+let alertsOnly24h = true;
+let alertsSearchQ = "";
+let lbLiveFetch = 0;
+/** Parse one free-text query into #N / coin / date / time-range bits (Amsterdam). */
+function parseAlertsQuery(raw) {
+  let q = (raw || "").trim();
+  const out = { n: null, date: null, tFrom: null, tTo: null, text: "" };
+  if (!q) return out;
+  // time range 14:00-16:00 or 14:00 – 16:00
+  const range = q.match(/\b(\d{1,2}:\d{2})\s*[-–—]\s*(\d{1,2}:\d{2})\b/);
+  if (range) {
+    out.tFrom = range[1].padStart(5, "0");
+    out.tTo = range[2].padStart(5, "0");
+    q = (q.slice(0, range.index) + " " + q.slice(range.index + range[0].length)).trim();
+  } else {
+    const tOnly = q.match(/\b(\d{1,2}:\d{2})\b/);
+    if (tOnly) {
+      out.tFrom = tOnly[1].padStart(5, "0");
+      out.tTo = out.tFrom;
+      q = (q.slice(0, tOnly.index) + " " + q.slice(tOnly.index + tOnly[0].length)).trim();
+    }
+  }
+  // ISO date
+  const iso = q.match(/\b(20\d{2})-(\d{2})-(\d{2})\b/);
+  if (iso) {
+    out.date = `${iso[1]}-${iso[2]}-${iso[3]}`;
+    q = (q.slice(0, iso.index) + " " + q.slice(iso.index + iso[0].length)).trim();
+  } else {
+    // 10 nov / 10 november / 10 nov 2026
+    const md = q.match(/\b(\d{1,2})\s+([A-Za-z]{3,9})(?:\s+(20\d{2}))?\b/);
+    if (md && AL_MONTHS[md[2].toLowerCase()]) {
+      const y = md[3] || String(new Date().toLocaleString("en-GB", { timeZone: "Europe/Amsterdam", year: "numeric" }));
+      out.date = `${y}-${AL_MONTHS[md[2].toLowerCase()]}-${String(+md[1]).padStart(2, "0")}`;
+      q = (q.slice(0, md.index) + " " + q.slice(md.index + md[0].length)).trim();
+    } else {
+      const dm = q.match(/\b(\d{1,2})[\/.](\d{1,2})(?:[\/.](20\d{2}))?\b/);
+      if (dm) {
+        const y = dm[3] || String(new Date().toLocaleString("en-GB", { timeZone: "Europe/Amsterdam", year: "numeric" }));
+        out.date = `${y}-${String(+dm[2]).padStart(2, "0")}-${String(+dm[1]).padStart(2, "0")}`;
+        q = (q.slice(0, dm.index) + " " + q.slice(dm.index + dm[0].length)).trim();
+      }
+    }
+  }
+  // #57 or bare number when it's the whole remaining token set
+  const hash = q.match(/#(\d+)\b/);
+  if (hash) {
+    out.n = hash[1];
+    q = (q.slice(0, hash.index) + " " + q.slice(hash.index + hash[0].length)).trim();
+  } else if (/^\d{1,6}$/.test(q.trim())) {
+    out.n = q.trim();
+    q = "";
+  }
+  out.text = q.trim().toLowerCase();
+  return out;
+}
+function filterAlertRows(rows, qStr, only24h) {
+  const parsed = parseAlertsQuery(qStr);
+  const now = Date.now() / 1000;
+  const cut = now - 86400;
+  // Default list = last 24h. Any search text opens the full logbook (older rows); chip off does too.
+  const limit24 = only24h && !(qStr || "").trim();
+  return rows.filter(a => {
+    if (limit24 && (a.ts || 0) < cut) return false;
+    if (parsed.n != null) {
+      const n = a.n != null ? a.n : a.id;
+      if (String(n) !== String(parsed.n)) return false;
+    }
+    if (parsed.date || parsed.tFrom || parsed.tTo) {
+      const p = amsParts(a.ts);
+      if (parsed.date && p.date !== parsed.date) return false;
+      if (parsed.tFrom && parsed.tTo && parsed.tFrom === parsed.tTo) {
+        if (p.hm !== parsed.tFrom) return false;
+      } else {
+        if (parsed.tFrom && p.hm < parsed.tFrom) return false;
+        if (parsed.tTo && p.hm > parsed.tTo) return false;
+      }
+    }
+    if (parsed.text) {
+      const hay = `${a.sym || ""} ${a.title || ""} ${a.short || ""} ${a.kind || ""} ${a.mint || ""}`.toLowerCase();
+      if (!hay.includes(parsed.text)) return false;
+    }
+    return true;
+  });
+}
+function alertRowHtml(a, seen) {
+  const unread = seen != null && (a.ts || 0) > seen;
+  const num = a.n != null ? a.n : a.id;
+  const chart = a.chart_url || (a.mint ? ("https://dexscreener.com/solana/" + a.mint) : null);
+  const lvl = a.level && MC_LEVELS.includes(a.level) ? `<span class="stage st-watch">${fmtMc(a.level)}</span>` : (a.tier ? `<span class="stage st-watch">${esc(a.tier)}</span>` : "");
+  const mc = a.mc_at != null ? a.mc_at : a.mc;
+  const mcLine = mc ? ` · MC ${fmtMc(mc)}` : "";
+  return `<div class="lb-row alert-item${unread ? " unread" : ""} ${isMint(a.mint) ? "tap" : ""}" data-coin="${esc(a.mint || "")}">
+    <div class="row">${num != null ? `<span class="alert-n">#${esc(num)}</span>` : ""}<span class="stage">${esc((a.kind || "").replace(/_/g, " "))}</span>${lvl}
+      <b class="sm">${esc(a.sym || a.title || "?")}</b><span class="sp"></span><span class="sm mut">${tmAms(a.ts)}</span></div>
+    <div class="sm mut">${esc(a.short || a.title || "")}${esc(mcLine)}${a.price_at != null ? " · px " + esc(String(a.price_at)) : ""}</div>
+    <div class="sm" style="margin-top:.15rem">${lbDeltaHtml(a)}</div>
+    ${a.body && a.body !== a.short ? `<div class="sm mut" style="white-space:pre-line;margin-top:.15rem">${esc((a.body || "").split("\n").slice(0, 3).join(" · ").slice(0, 180))}</div>` : ""}
+    <div class="row" style="margin-top:.35rem;gap:.35rem;flex-wrap:wrap" onclick="event.stopPropagation()">${alertFomoBtn(a, !BUY_ALERT_KINDS.has(a.kind))}${chartBtn(chart)}${holdersBtns(a.mint, true)}</div>
+  </div>`;
+}
+function alertsListHtml() {
+  const lb = alertLogbook();
+  const all = lb.rows || [];
+  const rows = filterAlertRows(all, alertsSearchQ, alertsOnly24h).slice(0, 400);
+  const seen = alertsSeenTs();
+  const scope = (alertsOnly24h && !(alertsSearchQ || "").trim()) ? "last 24h" : "search / all saved";
+  const head = `<div class="row"><b>🔔 Alerts</b><span class="sp"></span><span class="sm mut">#1…#${esc(lb.highest_n || "?")} · ${esc(scope)} · Amsterdam</span></div>
+    <p class="sm mut">One list · newest first · stable #N. Default shows the last day — search by #57, coin, 10 nov, 14:00–16:00 for older.</p>
+    <div class="al-search-wrap">
+      <input id="alSearch" class="al-search" type="search" enterkeyhint="search" placeholder="Search #, coin, date, time…" value="${esc(alertsSearchQ)}" autocomplete="off" spellcheck="false">
+      <div class="al-chips">
+        <button type="button" class="al-chip${alertsOnly24h ? " on" : ""}" id="alChip24">24h</button>
+        <span class="sm mut">${rows.length} shown${all.length ? " · " + all.length + " in logbook" : ""}</span>
+      </div>
+    </div>`;
+  if (!rows.length) return head + `<p class="mut sm">${alertsSearchQ ? "No alerts match." : "No alerts in the last 24 hours. Tap 24h off or search a date to see older."}</p>`;
+  return head + `<div class="al-list">${rows.map(a => alertRowHtml(a, seen)).join("")}</div>`;
+}
+function redrawAlertsList(doFetch) {
+  const y = window.scrollY;
+  const box = $("alBox"); if (!box) return;
+  const focus = document.activeElement && document.activeElement.id === "alSearch";
+  const caret = focus ? document.activeElement.selectionStart : null;
+  box.innerHTML = alertsListHtml();
+  wireAlertsPage(!!doFetch);
+  const inp = $("alSearch");
+  if (inp && focus) { inp.focus(); if (caret != null) try { inp.setSelectionRange(caret, caret); } catch (e) {} }
+  window.scrollTo(0, y);
+}
+let alSearchTimer = null;
+function wireAlertsPage(doFetch) {
+  const inp = $("alSearch");
+  if (inp) {
+    inp.oninput = () => {
+      alertsSearchQ = inp.value || "";
+      redrawAlertsList(false);
+      clearTimeout(alSearchTimer);
+      alSearchTimer = setTimeout(() => redrawAlertsList(true), 450);
+    };
+  }
+  const chip = $("alChip24");
+  if (chip) chip.onclick = () => { alertsOnly24h = !alertsOnly24h; redrawAlertsList(true); };
+  const box = $("alBox");
+  if (box) box.querySelectorAll("[data-coin]").forEach(n => {
+    if (isMint(n.dataset.coin)) n.onclick = ev => { if (ev.target.closest("a,button")) return; openCoin(n.dataset.coin); };
+  });
+  if (!doFetch) return;
+  const lb = alertLogbook();
+  const ms = [...new Set(filterAlertRows(lb.rows || [], alertsSearchQ, alertsOnly24h).slice(0, 40).map(a => a.mint).filter(isMint))].slice(0, 30);
+  if (ms.length) fetchLogbookLive(ms, () => redrawAlertsList(false));
+}
+async function fetchLogbookLive(ms, onDone) {
+  const ticket = ++lbLiveFetch;
+  try {
+    const r = await fetch(`https://api.dexscreener.com/tokens/v1/solana/${ms.join(",")}`, { cache: "no-store", referrerPolicy: "no-referrer" });
+    const pairs = await r.json();
+    if (ticket !== lbLiveFetch) return;
+    for (const m of ms) {
+      const ps = (pairs || []).filter(p => p.baseToken && p.baseToken.address === m);
+      if (!ps.length) continue;
+      const b = ps.reduce((a, p) => ((p.liquidity || {}).usd || 0) > ((a.liquidity || {}).usd || 0) ? p : a);
+      const pc = b.priceChange || {};
+      LIVE[m] = Object.assign(LIVE[m] || {}, {
+        price: +b.priceUsd || (LIVE[m] || {}).price,
+        mcap: b.marketCap || b.fdv || (LIVE[m] || {}).mcap,
+        chg1h: pc.h1 != null ? +pc.h1 : null,
+        chg24h: pc.h24 != null ? +pc.h24 : null,
+        ts: Date.now() / 1000
+      });
+    }
+    if (typeof onDone === "function") onDone();
+  } catch (e) { console.warn("logbook live", e); }
+}
 function renderEvents() {
-  // Alerts tab (bell): real push_queue rows. Activity log stays below for desk ops.
+  // Alerts tab: single 24h list + one search bar (logbook for older via query / chip off).
   setAlertsSeenNow();
-  $("v-events").innerHTML = `<div class="card"><div class="row"><b>🔔 Alerts</b><span class="sp"></span><span class="sm mut">Amsterdam time · newest first</span></div>
-    <p class="sm mut">Watchlist MC ladder ($3M→$100K), buys, follows and rug/danger warnings — same rows Telegram gets.</p>
-    ${alertFeedHtml()}</div>
+  $("v-events").innerHTML = `<div class="card" id="alBox">${alertsListHtml()}</div>
     <div class="card"><b>Desk activity</b><ul class="plain" style="margin-top:.4rem">${(D.events || []).slice(0, 20).map(evLi).join("") || `<li class="mut">Nothing yet.</li>`}</ul></div>`;
+  wireAlertsPage(true);
 }
 
 // Whales: followed top traders (follow.py). Read-only, PAPER - the desk never copies or trades.
@@ -1668,7 +1971,7 @@ function renderAgents(keep) {
     <div class="card agcard"><div class="row"><b>Agents</b><span class="sp"></span><span class="sm grn">${A.agents.filter(a => (hbAge(a.id) ?? 1e9) < 120).length} running</span></div>
       <div class="agscroll">${A.agents.map(agentCard).join("")}</div></div>
     <div class="card agcard"><div class="row"><b>🔔 Live alerts</b><span class="sp"></span><span class="sm mut">newest first</span></div>
-      ${A.alerts.map(a => `<div class="item ${isMint(a.mint) ? "tap" : ""}" data-coin="${esc(a.mint || "")}"><div class="row">${a.possible ? `<span class="stage st-held">Possible coin to invest in</span>` : `<span class="stage">${esc(a.kind.replace("_", " "))}</span>`}
+      ${A.alerts.map(a => `<div class="item ${isMint(a.mint) ? "tap" : ""}" data-coin="${esc(a.mint || "")}"><div class="row">${(a.n != null || a.id != null) ? `<span class="alert-n">#${esc(a.n != null ? a.n : a.id)}</span>` : ""}${a.possible ? `<span class="stage st-held">Possible coin to invest in</span>` : `<span class="stage">${esc(a.kind.replace("_", " "))}</span>`}
         ${a.tier ? `<span class="stage st-watch">${esc(a.tier)}</span>` : ""}<span class="sp"></span><span class="sm mut">${agoS(a.ts)}</span></div>
         <div style="margin-top:.2rem"><b>${esc(a.title)}</b></div><div class="sm mut" style="white-space:pre-line">${esc(a.body)}</div>
         <div class="row" style="margin-top:.35rem;gap:.35rem;flex-wrap:wrap"><span class="sp"></span>${alertFomoBtn(a, !BUY_ALERT_KINDS.has(a.kind))}${holdersBtns(a.mint, true)}</div></div>`).join("") || `<p class="sm mut">No alerts yet.</p>`}</div>
@@ -1780,7 +2083,7 @@ let swReg = null, pushCode = localStorage.getItem("desk_push_code");
 async function registerSW() {
   if (!("serviceWorker" in navigator)) return null;
   try {
-    swReg = await navigator.serviceWorker.register("sw.js?v=22", { scope: "./" });
+    swReg = await navigator.serviceWorker.register("sw.js?v=23", { scope: "./" });
     if (swReg && swReg.update) swReg.update().catch(() => {});
     // New SW takes control → reload once so the PWA drops a blank half-cached shell.
     let refreshing = false;

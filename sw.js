@@ -1,5 +1,5 @@
 // Desk service worker. CACHE_VER bump forces phones to drop stale app shells.
-const CACHE_VER = "desk-static-v22";
+const CACHE_VER = "desk-static-v23";
 const SCOPE = self.registration.scope;
 const OPEN_HOSTS = ["fomo.family"];
 
