@@ -241,6 +241,27 @@ function renderHeader() {
   $("upd").innerHTML = `<span class="${old ? "red" : ""}">Updated ${ago(D.ts)}</span>`;
 }
 
+function morningHtml() {
+  const m = D.morning;
+  if (!m) return `<div class="card" id="morning"><b>Morning page</b><p class="sm mut" style="margin-top:.3rem">The first morning report arrives after the next 08:00 run.</p></div>`;
+  const coinA = c => { const u = safeUrl(c.link); return u ? `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(c.sym)}</a>` : esc(c.sym); };
+  const passes = (m.passes || []).map(c => `<li>✅ ${coinA(c)} <span class="mut">score ${c.trade_score == null ? "–" : Math.round(c.trade_score)}</span></li>`).join("")
+    || `<li class="mut">No coin passed every check.</li>`;
+  const blocked = (m.blocked || []).slice(0, 5).map(c => `<li>⛔ ${coinA(c)} <span class="mut">${esc(c.reason)}</span>${c.later_pct == null ? "" : ` <span class="${cls(c.later_pct)}">later ${pct(c.later_pct)}</span>`}</li>`).join("")
+    || `<li class="mut">Nothing blocked.</li>`;
+  return `<div class="card" id="morning"><div class="row"><b>☀️ Morning page${m.test ? " (TEST)" : ""}</b><span class="sp"></span><span class="sm mut">${tm(m.ts)}</span></div>
+    <div class="grid2" style="margin-top:.5rem">
+      <div class="kv"><span class="mut sm">Stack (${esc(m.mode)})</span><b>${usd(m.equity)}</b></div>
+      <div class="kv"><span class="mut sm">Day P&L</span><b class="${cls(m.day_pnl)}">${usd(m.day_pnl, 1)}</b></div>
+      <div class="kv"><span class="mut sm">Trades closed</span><b>${m.closed} · ${m.wins} won</b></div>
+      <div class="kv"><span class="mut sm">Realised</span><b class="${cls(m.realised)}">${usd(m.realised, 1)}</b></div>
+      <div class="kv"><span class="mut sm">Coins checked</span><b>${m.scanned}</b></div>
+      <div class="kv"><span class="mut sm">Rugs caught</span><b>${m.rugs}</b></div></div>
+    <div class="sm" style="margin-top:.5rem"><b>Passed</b><ul class="plain">${passes}</ul></div>
+    <div class="sm" style="margin-top:.4rem"><b>Top blocked</b><ul class="plain">${blocked}</ul></div>
+    <div class="sm mut" style="margin-top:.4rem">Market: ${esc(m.market)} · buy alerts ${esc(m.buy_alerts)}${m.skips_cleared == null ? "" : ` · skip list cleared (${m.skips_cleared})`}</div></div>`;
+}
+
 function renderHome() {
   const s = D.state, now = Date.now() / 1000, minsOld = (now - D.ts) / 60;
   const bn = [];
@@ -269,6 +290,7 @@ function renderHome() {
       <li>✓ Daily loss stop at -${esc(r.daily_loss_stop_pct)}% locks the desk until midnight</li>
       <li>✓ ${esc(s.max_losses_in_row)} losses in a row pause the desk</li></ul></div>
   </div><div>
+    ${morningHtml()}
     <div class="card"><div class="row"><b>Agents</b><span class="sp"></span><span class="sm mut">feed: ${esc(D.source)}</span></div><ul class="plain sm" style="margin-top:.4rem">
       ${agents.length ? agents.map(([n, ts]) => { const late = (now - ts) / 60 > STALE_MIN;
         return `<li class="row"><span class="dot" style="background:${late ? "var(--red)" : "var(--grn)"}"></span><span style="text-transform:capitalize">${esc(n)}</span><span class="sp"></span><span class="${late ? "red" : "mut"}">${late ? "silent " : ""}${ago(ts)}</span></li>`; }).join("")
