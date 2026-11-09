@@ -261,6 +261,21 @@ function chartBtn(u) {
   return (typeof u === "string" && /^https:\/\/dexscreener\.com\/[A-Za-z0-9\/]+$/.test(u))
     ? `<a class="btn ghost" href="${esc(u)}" target="_blank" rel="noopener noreferrer">Open chart</a>` : "";
 }
+// Holder / wallet-owner links (plain, no referral). Same base58 shape as a Solana mint/wallet.
+function holdersBtns(mint, compact) {
+  if (typeof mint !== "string" || !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(mint)) return "";
+  const sty = compact ? ' style="padding:.2rem .55rem;font-size:.75rem"' : "";
+  const a = (lab, href) => `<a class="btn ghost"${sty} href="${esc(href)}" target="_blank" rel="noopener noreferrer">${lab}</a>`;
+  // Wallets = Solscan holders tab (who owns what); Bubblemaps + GMGN sit beside it
+  return a("Wallets", `https://solscan.io/token/${mint}#holders`)
+    + a("Bubblemaps", `https://app.bubblemaps.io/sol/token/${mint}`)
+    + a("GMGN", `https://gmgn.ai/sol/token/${mint}`);
+}
+function walletLink(w, label) {
+  if (typeof w !== "string" || !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(w)) return `<code>${esc(label != null ? label : shortMint(w))}</code>`;
+  const lab = label != null ? label : shortMint(w);
+  return `<a href="${esc("https://solscan.io/account/" + w)}" target="_blank" rel="noopener noreferrer"><code>${esc(lab)}</code></a>`;
+}
 const STALE_MIN = 20;
 let D = null, view = localStorage.getItem("desk_view") || "home", aIdx = 0;
 
@@ -373,7 +388,7 @@ function renderAudit() {
         return `<div class="chk ${st}" style="animation-delay:${i * 45}ms"><div class="ic ic-${st}">${st === "ok" ? "✓" : st === "bad" ? "!" : "–"}</div>
           <div><div class="lab">${esc(r.label)}</div><div class="val">${esc(r.value)}</div></div></div>`; }).join("")}</div>
       <div class="verdict ${ok ? "v-ok" : "v-bad"}">${verdict}</div>
-      <div class="row" style="margin-top:.7rem"><span class="row" style="gap:.4rem;flex-wrap:wrap">${fomoBtn(a.link, true)}${chartBtn(a.chart_url)}</span><span class="sp"></span><span class="sm mut">${aIdx + 1} / ${L.length}</span></div>
+      <div class="row" style="margin-top:.7rem;flex-wrap:wrap;gap:.4rem"><span class="row" style="gap:.4rem;flex-wrap:wrap">${fomoBtn(a.link, true)}${chartBtn(a.chart_url)}${holdersBtns(a.mint)}</span><span class="sp"></span><span class="sm mut">${aIdx + 1} / ${L.length}</span></div>
     </div>
     <div class="nav2"><button id="aPrev" aria-label="previous coin">‹</button>
       <div class="dots">${L.map((x, i) => `<i class="${i === aIdx ? "on" : ""} ${x.banner === "Cleared" ? "g" : "r"}" data-i="${i}"></i>`).join("")}</div>
@@ -439,7 +454,7 @@ function renderCoins() {
       ${scoreParts(c)}
       <div class="sm ${c.blocked ? "blk" : "mut"}">${esc(c.why || c.scan?.reason || (c.audit ? "Audit: " + c.audit : ""))}</div>
       ${c.scan ? `<div class="sm mut">liq $${c.scan.liq != null ? Math.round(c.scan.liq).toLocaleString() : "–"} · 1h ${pct(c.scan.h1)}</div>` : ""}</div></div>
-      <div class="row" style="margin-top:.4rem">${c.audit ? `<button class="btn ghost" data-audit="${esc(c.mint)}">Audit</button>` : ""}<span class="sp"></span>${chartBtn(c.chart_url)}${fomoBtn(c.link, true)}</div></div>`).join("")
+      <div class="row" style="margin-top:.4rem;gap:.35rem;flex-wrap:wrap">${c.audit ? `<button class="btn ghost" data-audit="${esc(c.mint)}">Audit</button>` : ""}<span class="sp"></span>${chartBtn(c.chart_url)}${fomoBtn(c.link, true)}${holdersBtns(c.mint, true)}</div></div>`).join("")
       || `<p class="mut">No coins yet.</p>`}</div>`;
   document.querySelectorAll("[data-audit]").forEach(b => b.onclick = () => {
     aIdx = auditList().findIndex(a => a.mint === b.dataset.audit); show("audit"); });
@@ -452,11 +467,11 @@ function tradesHtml(compact) {
       <b class="${cls(p.upnl)}">${usd(p.upnl, 1)} <span class="sm">${pct(p.upnl_pct)}</span></b></div>
       <div class="sm mut">${usd(p.size)} in · entry ${px(p.entry)} · now ${px(p.last)} · stop ${px(p.stop)}</div>
       <div class="sm mut">opened ${tm(p.opened)} · fees ${usd(p.fees)}</div></div></div>
-      <div class="row" style="margin-top:.4rem"><span class="sp"></span>${chartBtn(p.chart_url)}${fomoBtn(p.link)}</div></div>`).join("");
+      <div class="row" style="margin-top:.4rem;gap:.35rem;flex-wrap:wrap"><span class="sp"></span>${chartBtn(p.chart_url)}${fomoBtn(p.link)}${holdersBtns(p.mint, true)}</div></div>`).join("");
   const closed = T.map(t => `<div class="item"><div class="row"><b>${esc(t.sym || shortMint(t.mint))}</b><span class="sm mut">${tm(t.closed)}</span><span class="sp"></span>
       <b class="${cls(t.pnl)}">${usd(t.pnl, 1)} <span class="sm">${pct(t.pnl_pct)}</span></b></div>
       <div class="sm mut">${usd(t.size)} · ${px(t.entry)} → ${px(t.exit)} · ${esc(t.reason || "")}</div>
-      <div class="row" style="margin-top:.4rem"><span class="sp"></span>${chartBtn(t.chart_url)}${fomoBtn(t.link, true)}</div></div>`).join("");
+      <div class="row" style="margin-top:.4rem;gap:.35rem;flex-wrap:wrap"><span class="sp"></span>${chartBtn(t.chart_url)}${fomoBtn(t.link, true)}${holdersBtns(t.mint, true)}</div></div>`).join("");
   const total = T.reduce((s, t) => s + (t.pnl || 0), 0);
   return `<div class="card"><div class="row"><b>Open positions${compact ? " (live)" : ""}</b><span class="sp"></span><span class="sm mut">${O.length}</span></div>
       ${open || `<p class="mut sm">No open positions.</p>`}</div>
@@ -494,10 +509,11 @@ function renderWhales() {
   const hot = V.hot.map(c => `<div class="item"><div class="row"><b>${esc(c.sym || shortMint(c.mint))}</b>
       <span class="stage">${c.buyers} wallets</span><span class="sp"></span><b class="${cls(c.move_pct)}">${pct(c.move_pct)}</b></div>
       <div class="sm mut">$${Math.round(c.usd).toLocaleString()} bought · avg ${px(c.avg_px)} → now ${px(c.now)} · ${ago(c.last)}</div>
-      <div class="row" style="margin-top:.4rem"><span class="sp"></span>${chartBtn(c.chart_url)}${fomoBtn(c.link, true)}</div></div>`).join("");
+      <div class="row" style="margin-top:.4rem;gap:.35rem;flex-wrap:wrap"><span class="sp"></span>${chartBtn(c.chart_url)}${fomoBtn(c.link, true)}${holdersBtns(c.mint, true)}</div></div>`).join("");
   const lg = V.log.map(t => `<li><div class="row"><span class="stage ${t.side === "buy" ? "st-held" : "st-rejected"}">${esc(t.side)}</span>
       <b class="sm">${esc(t.who)}</b><span class="sm">${esc(t.sym || shortMint(t.mint))} · $${Math.round(t.usd || 0).toLocaleString()}</span>
-      <span class="sp"></span><span class="sm mut">${tm(t.ts)}</span></div></li>`).join("");
+      <span class="sp"></span><span class="sm mut">${tm(t.ts)}</span></div>
+      <div class="row" style="margin-top:.25rem;gap:.35rem;flex-wrap:wrap">${holdersBtns(t.mint, true)}</div></li>`).join("");
   const A = V.auto;
   const autoCard = !A ? "" : `<div class="card"><div class="row"><b>🧪 Auto PAPER trades</b><span class="sp"></span><span class="stage">${A.enabled ? "auto on" : "auto off"}</span></div>
       <div class="row" style="margin:.35rem 0"><b style="font-size:1.35rem" class="${cls(A.pnl)}">${usd(A.pnl, 1)}</b><span class="mut sm" style="margin-left:.4rem">closed · open ${usd(A.open_pnl, 1)}</span><span class="sp"></span>
@@ -506,7 +522,8 @@ function renderWhales() {
       ${A.tiers.map(b => `<tr><td>${esc(b.tier)} <span class="mut sm">$${A.rules.sizes[b.tier] || ""}</span></td><td style="text-align:right">${b.trades}</td><td style="text-align:right">${b.open}</td>
         <td style="text-align:right">${b.win_rate != null ? Math.round(b.win_rate * 100) + "%" : "–"}</td><td style="text-align:right" class="${cls(b.pnl + b.open_pnl)}">${usd(b.pnl + b.open_pnl, 1)}</td></tr>`).join("")}</table>
       ${(A.recent || []).slice(0, 8).map(r => `<div class="sm" style="margin-top:.3rem">${esc(r.sym || shortMint(r.mint))} <span class="stage">${esc(r.tier)}</span> $${r.size}
-        · <b class="${cls(r.pnl)}">${usd(r.pnl, 1)}</b> ${r.closed ? `<span class="mut">${esc(r.reason || "")}</span>` : `<span class="stage st-watch">open</span>`} <span class="mut">${tm(r.opened)}</span></div>`).join("")}
+        · <b class="${cls(r.pnl)}">${usd(r.pnl, 1)}</b> ${r.closed ? `<span class="mut">${esc(r.reason || "")}</span>` : `<span class="stage st-watch">open</span>`} <span class="mut">${tm(r.opened)}</span>
+        <div class="row" style="margin-top:.2rem;gap:.35rem;flex-wrap:wrap">${holdersBtns(r.mint, true)}</div></div>`).join("")}
       <p class="sm mut">PAPER only - simulated with slippage + FOMO fees, no real money. Sells ${A.rules.tp_sell_pct}% at +${A.rules.tp_pct}%, trails the rest, stop -${A.rules.stop_pct}%, max ${A.rules.max_per_day}/day. /autopaper on|off</p></div>`;
   $("v-whales").innerHTML = `<div class="card"><div class="row"><b>🐋 Whales</b><span class="sp"></span><span class="stage">${V.enabled ? "alerts on" : "alerts off"}</span></div>
       <div style="margin:.35rem 0"><b style="font-size:1.35rem">${V.traded_today} of ${V.followed}</b> <span class="mut">whales traded today</span></div>
@@ -594,7 +611,8 @@ function posRow(p) {
   return `<div class="item tap" data-coin="${esc(p.mint)}"><div class="row"><b>${esc(p.sym || shortMint(p.mint))}</b>
     <span class="stage">${p.book === "auto" ? "auto · " + esc(p.tier) : p.book === "manual" ? "yours (logged)" : "desk"}</span><span class="sp"></span>
     <b class="${cls(L.pnl)}">${usd(L.pnl, 1)} <span class="sm">${pct(pc)}</span></b></div>
-    <div class="sm mut">PAPER $${p.size} · entry ${px(p.entry)} → ${L.live ? "live" : "last"} ${px(L.price)}${LIVE[p.mint] && LIVE[p.mint].mcap ? " · MC " + kusd(LIVE[p.mint].mcap) : ""} · ${tm(p.opened)}</div></div>`;
+    <div class="sm mut">PAPER $${p.size} · entry ${px(p.entry)} → ${L.live ? "live" : "last"} ${px(L.price)}${LIVE[p.mint] && LIVE[p.mint].mcap ? " · MC " + kusd(LIVE[p.mint].mcap) : ""} · ${tm(p.opened)}</div>
+    <div class="row" style="margin-top:.3rem;gap:.35rem;flex-wrap:wrap" onclick="event.stopPropagation()">${holdersBtns(p.mint, true)}</div></div>`;
 }
 function botCard(b, kind) {
   if (!b) return `<div class="card agcard"><b>Trader bot</b><p class="sm mut">No Trader bot data on the box.</p></div>`;
@@ -716,8 +734,8 @@ function traderView(t) {
   const con = Object.entries(t.contrib || {});
   return `<div class="card agcard"><button class="btn ghost" id="agBack">← Back to chart</button>
     <h2 style="margin:.6rem 0 .1rem">${esc(t.handle)}</h2><div class="sm">${platDots(t.platforms)} ${esc(t.platforms.join(" · "))}${t.multi ? " · ◆ multi-platform" : ""}</div>
-    <div class="sm mut" style="word-break:break-all;margin:.4rem 0"><code>${esc(t.wallet)}</code></div>
-    <div class="row" style="gap:.5rem"><button class="btn ghost" id="agCopy" data-w="${esc(t.wallet)}">Copy wallet</button><a class="btn ghost" href="${esc(safeUrl(t.gmgn) || "#")}" target="_blank" rel="noopener noreferrer">Open on GMGN</a></div>
+    <div class="sm mut" style="word-break:break-all;margin:.4rem 0">${walletLink(t.wallet, t.wallet)}</div>
+    <div class="row" style="gap:.5rem;flex-wrap:wrap"><button class="btn ghost" id="agCopy" data-w="${esc(t.wallet)}">Copy wallet</button><a class="btn ghost" href="${esc(safeUrl(t.gmgn) || "#")}" target="_blank" rel="noopener noreferrer">Open on GMGN</a><a class="btn ghost" href="${esc("https://solscan.io/account/" + t.wallet)}" target="_blank" rel="noopener noreferrer">Solscan</a></div>
     <div class="kv3" style="margin-top:.7rem"><div><b class="${cls(t.pnl)}">${kusd(t.pnl)}</b><span class="mut sm">~6-month realized PnL</span></div>
       <div><b>${t.win_rate != null ? Math.round(t.win_rate * 100) + "%" : "–"}</b><span class="mut sm">win rate (${t.wins ?? "–"}W/${t.losses ?? "–"}L)</span></div>
       <div><b>${t.hold_min != null ? Math.round(t.hold_min) + " min" : "–"}</b><span class="mut sm">avg (median) hold</span></div></div>
@@ -725,15 +743,15 @@ function traderView(t) {
     <div class="sm mut">${esc(t.boards.join(" · "))}</div></div>
   <div class="card agcard"><b>Wins / losses per month</b><div class="mbars">${bars || `<p class="sm mut">No monthly history for this wallet.</p>`}</div></div>
   <div class="card agcard"><b>Recent buys / sells</b>${t.recent.map(r => {
-    const m = r.mint, bm = isMint(m) ? ("https://app.bubblemaps.io/sol/token/" + m) : "";
+    const m = r.mint;
     const cached = isMint(m) ? linkLineFromCache(m, t.wallet) : "unknown";
-    return `<div class="tr-trade" style="margin-top:.5rem"><div class="row sm"><span class="stage ${r.side === "buy" ? "st-held" : "st-rejected"}">${esc(r.side)}</span>
+    return `<div class="tr-trade" style="margin-top:.5rem"><div class="row sm" style="flex-wrap:wrap;gap:.3rem"><span class="stage ${r.side === "buy" ? "st-held" : "st-rejected"}">${esc(r.side)}</span>
       <span>${esc(r.sym || shortMint(m))} · $${(r.usd || 0).toLocaleString()}</span><span class="sp"></span>
-      ${bm ? `<a class="btn ghost" style="padding:.2rem .55rem;font-size:.75rem" href="${esc(bm)}" target="_blank" rel="noopener noreferrer">Bubblemaps</a>` : ""}
+      ${holdersBtns(m, true)}
       <span class="mut">${tm(r.ts)}</span></div>
       <div class="sm mut" data-twlink="${esc(m || "")}" data-tww="${esc(t.wallet)}">${esc(cached)}</div></div>`;
   }).join("") || `<p class="sm mut">No trades seen by the follow poller yet.</p>`}</div>
-  <div class="card agcard"><b>Coins they pile into</b>${t.piles.map(c => `<div class="row sm" style="margin-top:.3rem"><b>${esc(c.sym || shortMint(c.mint))}</b><span class="sp"></span>$${(c.usd || 0).toLocaleString()} · ${c.n} buys</div>`).join("") || `<p class="sm mut">None seen yet.</p>`}
+  <div class="card agcard"><b>Coins they pile into</b>${t.piles.map(c => `<div class="row sm" style="margin-top:.3rem;flex-wrap:wrap;gap:.3rem"><b>${esc(c.sym || shortMint(c.mint))}</b><span class="sp"></span>$${(c.usd || 0).toLocaleString()} · ${c.n} buys ${holdersBtns(c.mint, true)}</div>`).join("") || `<p class="sm mut">None seen yet.</p>`}
     <div class="sm" style="margin-top:.6rem"><b>Alert tiers they helped trigger:</b> ${con.length ? con.map(([k, n]) => `${esc(k)} ×${n}`).join(" · ") : "none yet"}</div></div>`;
 }
 const BURN = new Set(["1nc1nerator11111111111111111111111111111111", "11111111111111111111111111111111"]);
@@ -835,11 +853,11 @@ function renderCoin() {
     <div class="sm">Dev sold: ${c.dev_sold_pct != null ? esc((+c.dev_sold_pct).toFixed(0)) + "% of his launch bag" : "unknown"}${L.rugged ? ` · <b class="red">RugCheck marks it RUGGED</b>` : ""}</div>
     <div class="sm" style="margin-top:.3rem">${c.rug ? `Desk rug check: ${esc(c.rug.text)} · <span class="mut">${esc(c.rug.why || "")}</span>` : "Desk rug check: not run on this coin."}</div>
     <div class="sm${R && (R.mintAuth || R.freezeAuth || L.rugged) ? " red" : ""}">${esc(rcLine)}</div>
-    <div class="row" style="margin-top:.6rem;gap:.5rem">${fomoBtn(flink)}<a class="btn ghost" href="${esc(c.bubblemaps || "https://app.bubblemaps.io/sol/token/" + m)}" target="_blank" rel="noopener noreferrer">Bubblemaps</a></div></div>
+    <div class="row" style="margin-top:.6rem;gap:.5rem;flex-wrap:wrap">${fomoBtn(flink)}${holdersBtns(m)}</div></div>
   <div class="card agcard"><b>Live chart</b>${embed ? `<iframe src="${esc(embed)}" title="chart" style="width:100%;height:360px;border:0;border-radius:10px;margin-top:.5rem" loading="lazy" referrerpolicy="no-referrer"></iframe>` : ""}
     <div class="sm mut" style="margin-top:.4rem">PAPER entry / exit on the desk's own price samples:</div>${priceSvg(c.series, marks)}</div>
   <div class="card agcard"><b>Top holders</b>${top.length ? top.slice(0, 20).map((h, i) => { const lb = labels(h);
-    return `<div class="row sm" style="margin-top:.3rem"><span class="mut" style="width:1.4rem">${i + 1}</span><code>${esc(shortMint(h.owner))}</code>${lb.map(x => `<span class="stage" style="margin-left:.25rem">${esc(x)}</span>`).join("")}<span class="sp"></span><b>${(h.pct || 0).toFixed(2)}%</b></div>`; }).join("")
+    return `<div class="row sm" style="margin-top:.3rem;flex-wrap:wrap;gap:.2rem"><span class="mut" style="width:1.4rem">${i + 1}</span>${walletLink(h.owner)}${lb.map(x => `<span class="stage" style="margin-left:.25rem">${esc(x)}</span>`).join("")}<span class="sp"></span><b>${(h.pct || 0).toFixed(2)}%</b></div>`; }).join("")
     : `<p class="sm mut">${L.rcTs ? "Top holders: unknown (RugCheck gave no list)." : "Loading from RugCheck…"}</p>`}</div>
   <div class="card agcard"><b>Followed traders holding it</b>${fh.map(h => `<div class="row sm" style="margin-top:.3rem"><b>#${h.rank} ${esc(h.handle)}</b><span class="sp"></span>${h.pct != null ? (+h.pct).toFixed(2) + "% (top holder)" : "bought $" + (h.usd || 0).toLocaleString()}</div>`).join("") || `<p class="sm mut">None seen: no followed wallet among the top holders or in the last 72 h of followed trades.</p>`}</div>
   <div class="card agcard"><b>PAPER position</b>${ps.map(p => { const lp = p.closed ? { pnl: p.pnl } : livePnl(p);
@@ -916,11 +934,12 @@ function renderAgents(keep) {
       ${A.alerts.map(a => `<div class="item ${isMint(a.mint) ? "tap" : ""}" data-coin="${esc(a.mint || "")}"><div class="row">${a.possible ? `<span class="stage st-held">Possible coin to invest in</span>` : `<span class="stage">${esc(a.kind.replace("_", " "))}</span>`}
         ${a.tier ? `<span class="stage st-watch">${esc(a.tier)}</span>` : ""}<span class="sp"></span><span class="sm mut">${agoS(a.ts)}</span></div>
         <div style="margin-top:.2rem"><b>${esc(a.title)}</b></div><div class="sm mut" style="white-space:pre-line">${esc(a.body)}</div>
-        ${a.url && a.kind !== "auto_paper" && a.kind !== "bedtime" ? `<div class="row" style="margin-top:.35rem"><span class="sp"></span>${fomoBtn(a.url, true)}</div>` : ""}</div>`).join("") || `<p class="sm mut">No alerts yet.</p>`}</div>
+        <div class="row" style="margin-top:.35rem;gap:.35rem;flex-wrap:wrap"><span class="sp"></span>${a.url && a.kind !== "auto_paper" && a.kind !== "bedtime" ? fomoBtn(a.url, true) : ""}${holdersBtns(a.mint, true)}</div></div>`).join("") || `<p class="sm mut">No alerts yet.</p>`}</div>
     <div class="card agcard"><b>Activity</b><ul class="plain" style="margin-top:.4rem">${A.activity.slice(0, 15).map(e => `<li><div class="row"><b class="sm">${esc(e.agent)}</b><span class="sm">${esc(e.text)}</span><span class="sp"></span><span class="sm mut">${agoS(e.ts)}</span></div>${e.why ? `<div class="sm mut">because ${esc(e.why)}</div>` : ""}</li>`).join("")}</ul></div>
     <div class="card agcard"><div class="row"><b>Closed PAPER trades</b><span class="sp"></span><span class="sm">win ${A.closed.length ? Math.round(wins / A.closed.length * 100) + "%" : "–"} of ${A.closed.length}</span></div>
       ${A.closed.map(p => `<div class="item tap" data-coin="${esc(p.mint)}"><div class="row"><b>${esc(p.sym || shortMint(p.mint))}</b><span class="stage">${p.book === "auto" ? "auto · " + esc(p.tier) : p.book === "manual" ? "yours (logged)" : "desk"}</span><span class="sp"></span><b class="${cls(p.pnl)}">${usd(p.pnl, 1)}</b></div>
-        <div class="sm mut">PAPER $${p.size} · ${esc(p.reason || "")} · ${tm(p.closed)}</div></div>`).join("") || `<p class="sm mut">No closed PAPER trades yet.</p>`}</div>
+        <div class="sm mut">PAPER $${p.size} · ${esc(p.reason || "")} · ${tm(p.closed)}</div>
+        <div class="row" style="margin-top:.3rem;gap:.35rem;flex-wrap:wrap" onclick="event.stopPropagation()">${holdersBtns(p.mint, true)}</div></div>`).join("") || `<p class="sm mut">No closed PAPER trades yet.</p>`}</div>
     ${bookCard(A)}
     <div class="card agcard"><div class="row"><b>🧪 Auto PAPER by tier</b><span class="sp"></span><span class="stage">${au.enabled ? "auto on" : "auto off"}</span></div>
       <table class="agt"><tr class="mut"><td>Tier</td><td>Size</td><td>Trades</td><td>Open</td><td>Win</td><td>P&amp;L</td></tr>${au.tiers.map(b => `<tr><td>${esc(b.tier)}</td><td>$${au.rules.sizes[b.tier]}</td><td>${b.trades}</td><td>${b.open}</td><td>${b.win_rate != null ? Math.round(b.win_rate * 100) + "%" : "–"}</td><td class="${cls(b.pnl)}">${usd(b.pnl, 1)}</td></tr>`).join("")}</table>
