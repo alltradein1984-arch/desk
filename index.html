@@ -7,7 +7,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' https: data:; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' https://api.dexscreener.com https://api.rugcheck.xyz https://api.geckoterminal.com; frame-src https://dexscreener.com https://www.dexscreener.com; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="theme-color" content="#07090c">
 <title>Desk</title>
-<!-- desk-build:18 buy-sell-fomo -->
+<!-- desk-build:19 chart-hold -->
 <script>
 // set the theme before first paint; Dark / Dim / Light (legacy auto/light migrated once)
 (function () { try {
@@ -39,12 +39,23 @@ header .upd{margin-left:auto;color:var(--mut);font-size:.68rem;text-align:right;
 .hdr-coin[hidden]{display:none!important}
 .hdr-btn{font-size:.65rem;font-weight:700;padding:.16rem .4rem;border-radius:8px;border:1px solid var(--line);color:var(--txt);text-decoration:none;background:var(--card2);white-space:nowrap;line-height:1.2}
 .hdr-btn[aria-disabled="true"]{opacity:.35;pointer-events:none}
-.live-chart{position:relative;margin:0;border-radius:12px;overflow:hidden;border:1px solid var(--line);background:var(--card2);min-height:340px}
-.live-chart iframe{display:block;width:100%;height:340px;border:0;background:transparent}
+.live-chart{position:relative;margin:0;border-radius:12px;overflow:hidden;border:1px solid var(--line);background:var(--card2);min-height:340px;touch-action:pan-x pan-y pinch-zoom;-webkit-user-select:none;user-select:none}
+.live-chart iframe{display:block;width:100%;height:340px;border:0;background:transparent;touch-action:auto;pointer-events:auto}
 .chart-loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:1;background:var(--card2);color:var(--mut);font-size:.85rem;font-weight:600;pointer-events:none}
 .live-chart.is-ready .chart-loading,.live-chart.is-failed .chart-loading{display:none}
 .chart-fallback{padding:.55rem .7rem;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:.4rem;align-items:center}
 .chart-fallback[hidden]{display:none!important}
+.chart-toolbar{display:flex;align-items:center;gap:.4rem;padding:.35rem .55rem;border-bottom:1px solid var(--line);background:var(--card)}
+.chart-toolbar .btn{font-size:.72rem;padding:.28rem .55rem}
+.chart-fs{position:fixed;inset:0;z-index:9999;background:#000;display:flex;flex-direction:column;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+.chart-fs[hidden]{display:none!important}
+.chart-fs .chart-fs-bar{display:flex;align-items:center;gap:.5rem;padding:.5rem .7rem;background:#111;color:#fff;flex:none}
+.chart-fs .chart-fs-bar .btn{background:#fff;color:#111}
+.chart-fs .chart-fs-body{flex:1;min-height:0;position:relative}
+.chart-fs .chart-fs-body .live-chart,.chart-fs .chart-fs-body .mc-chart-wrap{height:100%;margin:0;border:0;border-radius:0;min-height:0}
+.chart-fs .chart-fs-body .live-chart{height:100%}
+.chart-fs .chart-fs-body iframe{height:100%!important;min-height:100%}
+#chartPark{position:absolute;left:-9999px;top:0;width:1px;height:1px;overflow:hidden;pointer-events:none}
 .chart-miss{padding:.7rem .8rem;text-align:center;border:1px dashed var(--line);border-radius:12px;margin:0 0 .75rem}
 .mc-chart-wrap{margin:0 0 .75rem;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--card2)}
 .mc-chart{width:100%;height:320px}
@@ -321,14 +332,9 @@ function applyTheme() {
   if (meta) meta.setAttribute("content", THEME_COLOR[pref] || "#07090c");
   const b = document.getElementById("theme");
   if (b) b.textContent = THEME_LABEL[pref] || "Dark";
-  // Remount the visible live chart so Dark/Dim vs Light theme matches.
-  try {
-    if (typeof D !== "undefined" && D && typeof view !== "undefined") {
-      if (view === "audit" && typeof renderAudit === "function") renderAudit();
-      else if (view === "coin" && typeof renderCoin === "function") renderCoin();
-    }
-  } catch (e) {}
+  // Never remount/reload the Dex iframe on theme change — zoom/pan must survive.
 }
+
 applyTheme();
 document.getElementById("theme").onclick = () => {
   const cur = THEMES.includes(localStorage.getItem(THEME_KEY)) ? localStorage.getItem(THEME_KEY) : "dark";
@@ -464,6 +470,15 @@ function coinAlertsHtml(mint, n) {
     return `<span class="chip${fire ? " fire" : ""}">${esc(label)} · ${esc(when)}</span>`;
   }).join("")}</div>`;
 }
+// ---- Live Dex chart: keep the SAME iframe across feed refreshes (zoom/pan survive) ----
+const CHART_HOLD_MS = 60000;
+let chartHoldUntil = 0;
+const chartParkMap = new Map(); // mint -> .mc-chart-wrap element (live iframe)
+function chartHoldActive() { return Date.now() < chartHoldUntil; }
+function noteChartTouch() { chartHoldUntil = Date.now() + CHART_HOLD_MS; }
+function chartSlotHtml(mint) {
+  return `<div class="chart-slot" data-chart-slot="${esc(mint || "")}"></div>`;
+}
 function liveChartHtml(chartUrl, mint) {
   // DexScreener embed. Eager src (no loading=lazy — blank on Android standalone PWA).
   // referrerpolicy not no-referrer: Dex embed often stays blank without a referrer.
@@ -471,11 +486,13 @@ function liveChartHtml(chartUrl, mint) {
   const th = chartTheme();
   const open = chartBtn(chartUrl) || (addr ? chartBtn("https://dexscreener.com/solana/" + addr) : "");
   if (!addr) {
-    return `<div class="mc-chart-wrap" data-mint="${esc(mint || "")}"><div class="chart-miss mut sm">Chart unavailable – Open chart</div>
+    return `<div class="mc-chart-wrap" data-mint="${esc(mint || "")}"><div class="chart-toolbar"><button type="button" class="btn ghost chart-fs-btn" disabled>⛶ Full screen</button></div>
+      <div class="chart-miss mut sm">Chart unavailable – Open chart</div>
       <div class="chart-fallback">${open}</div></div>`;
   }
   const src = `https://dexscreener.com/solana/${addr}?embed=1&theme=${th}&chartTheme=${th}&info=0&trades=0&chartLeftToolbar=0&interval=5`;
   return `<div class="mc-chart-wrap" data-mint="${esc(mint || "")}" data-chart-src="${esc(src)}">
+    <div class="chart-toolbar"><button type="button" class="btn ghost chart-fs-btn" data-chart-fs>⛶ Full screen</button></div>
     <div class="live-chart" data-live-chart>
       <div class="chart-loading">Loading chart…</div>
       <iframe title="Live price chart" allow="clipboard-write; fullscreen" referrerpolicy="strict-origin-when-cross-origin"></iframe>
@@ -483,16 +500,46 @@ function liveChartHtml(chartUrl, mint) {
     <div class="chart-fallback" hidden><span class="sm mut">Chart unavailable –</span>${open || `<a class="btn ghost" href="${esc(src.split("?")[0])}" target="_blank" rel="noopener noreferrer">Open chart</a>`}</div>
   </div>`;
 }
+function parkChartWrap(wrap) {
+  if (!wrap) return;
+  const mint = wrap.getAttribute("data-mint") || "";
+  if (!mint) return;
+  const park = $("chartPark");
+  if (!park) return;
+  // Only park a wrap that already has a live iframe (armed/ready) so we can reuse it.
+  const iframe = wrap.querySelector("iframe");
+  if (iframe && (iframe.getAttribute("src") || iframe.src)) {
+    chartParkMap.set(mint, wrap);
+    park.appendChild(wrap);
+  }
+}
 function armLiveCharts(root) {
   const scope = root && root.querySelectorAll ? root : document;
   scope.querySelectorAll("[data-live-chart]").forEach(box => {
-    if (box.dataset.armed === "1") return;
-    box.dataset.armed = "1";
     const wrap = box.closest(".mc-chart-wrap");
     const iframe = box.querySelector("iframe");
     const fallback = wrap && wrap.querySelector(".chart-fallback");
     const src = wrap && wrap.getAttribute("data-chart-src");
     if (!iframe || !src) return;
+    // Touch / pointer on chart → hold card re-renders so zoom/pan survive feed polls.
+    if (box.dataset.holdBound !== "1") {
+      box.dataset.holdBound = "1";
+      const hold = () => noteChartTouch();
+      box.addEventListener("touchstart", hold, { passive: true });
+      box.addEventListener("pointerdown", hold, { passive: true });
+      wrap && wrap.addEventListener("touchstart", hold, { passive: true });
+    }
+    // Full screen button
+    const fsBtn = wrap && wrap.querySelector("[data-chart-fs]");
+    if (fsBtn && fsBtn.dataset.bound !== "1") {
+      fsBtn.dataset.bound = "1";
+      fsBtn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); openChartFullscreen(wrap); };
+    }
+    if (box.dataset.armed === "1") {
+      // Already armed: NEVER touch iframe.src (re-assigning reloads and kills zoom).
+      return;
+    }
+    box.dataset.armed = "1";
     let settled = false;
     const ok = () => {
       if (settled) return; settled = true;
@@ -507,13 +554,92 @@ function armLiveCharts(root) {
     };
     iframe.addEventListener("load", ok, { once: true });
     iframe.addEventListener("error", fail, { once: true });
-    // Set src immediately + again on next tick (standalone PWA race).
-    const assign = () => { try { iframe.src = src; } catch (e) { fail(); } };
-    assign();
-    setTimeout(assign, 0);
-    setTimeout(assign, 250);
-    setTimeout(() => { if (!settled) fail(); }, 8000);
+    // Set src once only. Retries without changing src string.
+    const cur = iframe.getAttribute("src") || "";
+    if (!cur) {
+      try { iframe.src = src; } catch (e) { fail(); }
+      // One delayed assign ONLY if still empty (standalone PWA race) — never if already set.
+      setTimeout(() => {
+        if (!(iframe.getAttribute("src") || iframe.src)) {
+          try { iframe.src = src; } catch (e) { fail(); }
+        }
+      }, 250);
+    } else {
+      ok();
+    }
+    setTimeout(() => { if (!settled && !(iframe.getAttribute("src") || iframe.src)) fail(); }, 8000);
   });
+}
+/** Place a live chart into a slot: reuse parked iframe for same mint (no reload). */
+function mountLiveChart(slotEl, chartUrl, mint) {
+  if (!slotEl) return;
+  const mintKey = mint || "";
+  // Prefer parked wrap for this mint (keeps zoom).
+  let wrap = mintKey && chartParkMap.get(mintKey);
+  if (wrap && wrap.isConnected && wrap.parentElement && wrap.parentElement.id === "chartPark") {
+    chartParkMap.delete(mintKey);
+    slotEl.replaceWith(wrap);
+    armLiveCharts(wrap);
+    return wrap;
+  }
+  // Prefer an already-visible wrap in this card for same mint.
+  const host = slotEl.parentElement;
+  if (host) {
+    const existing = host.querySelector(`.mc-chart-wrap[data-mint="${CSS.escape ? CSS.escape(mintKey) : mintKey}"]`);
+    if (existing && existing.querySelector("iframe[src], iframe[src='']") === null) { /* fallthrough */ }
+  }
+  // Build fresh only when we have no parked iframe.
+  const tmp = document.createElement("div");
+  tmp.innerHTML = liveChartHtml(chartUrl, mint);
+  wrap = tmp.firstElementChild;
+  slotEl.replaceWith(wrap);
+  armLiveCharts(wrap);
+  return wrap;
+}
+function openChartFullscreen(wrap) {
+  if (!wrap) return;
+  noteChartTouch();
+  let fs = $("chartFs");
+  if (!fs) {
+    fs = document.createElement("div");
+    fs.id = "chartFs";
+    fs.className = "chart-fs";
+    fs.hidden = true;
+    fs.innerHTML = `<div class="chart-fs-bar"><b class="sm">Chart</b><span class="sp"></span><button type="button" class="btn" id="chartFsClose">Close</button></div><div class="chart-fs-body" id="chartFsBody"></div>`;
+    document.body.appendChild(fs);
+    $("chartFsClose").onclick = closeChartFullscreen;
+  }
+  const body = $("chartFsBody");
+  // Move the SAME wrap into fullscreen (no iframe reload).
+  wrap.dataset.fsHome = "1";
+  if (!wrap._fsPlaceholder) {
+    const ph = document.createElement("div");
+    ph.className = "chart-slot";
+    ph.dataset.chartFsPh = "1";
+    wrap._fsPlaceholder = ph;
+  }
+  if (wrap.parentElement && !wrap.parentElement.id) {
+    wrap.parentElement.insertBefore(wrap._fsPlaceholder, wrap);
+  }
+  body.innerHTML = "";
+  body.appendChild(wrap);
+  fs.hidden = false;
+  document.body.style.overflow = "hidden";
+}
+function closeChartFullscreen() {
+  const fs = $("chartFs");
+  if (!fs) return;
+  const body = $("chartFsBody");
+  const wrap = body && body.querySelector(".mc-chart-wrap");
+  fs.hidden = true;
+  document.body.style.overflow = "";
+  if (wrap && wrap._fsPlaceholder && wrap._fsPlaceholder.parentElement) {
+    wrap._fsPlaceholder.replaceWith(wrap);
+  } else if (wrap) {
+    // Fall back: park it so next mount reuses.
+    parkChartWrap(wrap);
+  }
+  noteChartTouch();
 }
 function coinChartMeta(mint) {
   if (!mint) return "";
@@ -759,11 +885,32 @@ function boughtSize(mint) {
   const p = D.open.find(p => p.mint === mint) || D.trades.find(t => t.mint === mint);
   return p ? p.size : null;
 }
-function renderAudit() {
+function renderAudit(force) {
   const L = auditList();
   if (!L.length) { $("auditPane").innerHTML = `<div class="card mut">No coins audited yet.</div>`; renderSplitTrades(); return; }
   aIdx = Math.max(0, Math.min(aIdx, L.length - 1));
   const a = L[aIdx], ok = a.banner === "Cleared";
+  // Soft refresh while Mike is zooming: update text only, never touch the iframe.
+  const acard = $("acard");
+  const liveWrap = acard && acard.querySelector(`.mc-chart-wrap[data-mint="${a.mint}"]`);
+  if (!force && chartHoldActive() && liveWrap && acard) {
+    try {
+      const pill = acard.querySelector(".pill");
+      if (pill) { pill.className = "pill " + (ok ? "p-ok" : "p-bad"); pill.textContent = ok ? "Cleared" : "Rejected"; }
+      const meta = acard.querySelector(".mc-strip, .mc-alerts");
+      // refresh dex + meta blocks if present
+      const dex = acard.querySelector(".dex-info");
+      if (dex) dex.outerHTML = dexInfoPlaceholder(a.mint);
+      const strips = acard.querySelectorAll(".mc-strip, .mc-alerts");
+      strips.forEach(n => n.remove());
+      const coinEl = acard.querySelector(".coin");
+      if (coinEl) coinEl.insertAdjacentHTML("afterend", coinChartMeta(a.mint));
+      else liveWrap.insertAdjacentHTML("afterend", coinChartMeta(a.mint));
+      refreshDexInfo(a.mint);
+      renderHeader();
+    } catch (e) {}
+    return;
+  }
   const nOk = L.filter(x => x.banner === "Cleared").length;
   const checked = a.rows.filter(r => r.ok !== null && r.ok !== undefined);
   const passed = checked.filter(r => r.ok).length;
@@ -777,12 +924,14 @@ function renderAudit() {
     const main = (a.reasons[0] || (a.rows.find(r => r.ok === false) || {}).label || "failed checks").split(" - ")[0];
     verdict = `Rejected · ${esc(main)} · desk won't buy ${esc(a.sym || shortMint(a.mint))}`;
   }
+  // Park any live chart BEFORE wiping the pane (keeps iframe + zoom).
+  document.querySelectorAll("#auditPane .mc-chart-wrap[data-mint]").forEach(parkChartWrap);
   $("auditPane").innerHTML = `
     <div class="counters"><div class="counter"><b>${L.length}</b><span>Taken apart</span></div>
       <div class="counter"><b class="red">${L.length - nOk}</b><span>Rejected</span></div>
       <div class="counter"><b class="grn">${nOk}</b><span>Cleared</span></div></div>
     <div class="card" id="acard">
-      ${liveChartHtml(a.chart_url, a.mint)}
+      ${chartSlotHtml(a.mint)}
       <div class="coin">${logo(a)}<div><div style="font-weight:800;font-size:1.15rem">${esc(a.sym || "?")}</div>
         <div class="sm mut">${esc(a.name || "")}</div><div class="sm mut">${esc(shortMint(a.mint))} · Solana · ${ago(a.ts)}</div></div>
         <span class="pill ${ok ? "p-ok" : "p-bad"}">${ok ? "Cleared" : "Rejected"}</span></div>
@@ -799,12 +948,13 @@ function renderAudit() {
       <div class="dots">${L.map((x, i) => `<i class="${i === aIdx ? "on" : ""} ${x.banner === "Cleared" ? "g" : "r"}" data-i="${i}"></i>`).join("")}</div>
       <button id="aNext" aria-label="next coin">›</button></div>
     <p class="sm mut" style="text-align:center">Swipe or tap ‹ › to flip through coins. All checks run on every coin.</p>`;
-  $("aPrev").onclick = () => { aIdx = (aIdx - 1 + L.length) % L.length; renderAudit(); };
-  $("aNext").onclick = () => { aIdx = (aIdx + 1) % L.length; renderAudit(); };
-  document.querySelectorAll(".dots i").forEach(d => d.onclick = () => { aIdx = +d.dataset.i; renderAudit(); });
+  $("aPrev").onclick = () => { aIdx = (aIdx - 1 + L.length) % L.length; renderAudit(true); };
+  $("aNext").onclick = () => { aIdx = (aIdx + 1) % L.length; renderAudit(true); };
+  document.querySelectorAll(".dots i").forEach(d => d.onclick = () => { aIdx = +d.dataset.i; renderAudit(true); });
   renderSplitTrades();
   renderHeader();
-  armLiveCharts($("acard") || $("auditPane"));
+  const slot = document.querySelector("#acard [data-chart-slot]");
+  mountLiveChart(slot, a.chart_url, a.mint);
   refreshDexInfo(a.mint);
 }
 function renderSplitTrades() { $("splitTrades").innerHTML = tradesHtml(true); }
@@ -1282,9 +1432,25 @@ function renderCoin() {
   const sup = R && R.supply ? R.supply / 10 ** (R.decimals || 0) : null;
   const devPct = R && R.creatorBalance != null && sup ? R.creatorBalance / 10 ** (R.decimals || 0) / sup * 100 : (c.dev_pct != null ? +c.dev_pct : null);
   const chartUrl = (ps[0] || {}).chart_url || (c.link && null) || (pair ? ("https://dexscreener.com/solana/" + pair) : null);
+  // Soft refresh while zooming: keep the same iframe, update surrounding text only.
+  const existingWrap = el.querySelector(`.mc-chart-wrap[data-mint="${m}"]`);
+  if (chartHoldActive() && existingWrap) {
+    try {
+      const upd = $("coinUpd");
+      if (upd) upd.textContent = `price ${L.ts ? agoS(L.ts) : "loading…"} · holders ${L.rcTs ? agoS(L.rcTs) : "loading…"}`;
+      el.querySelectorAll(".mc-strip, .mc-alerts").forEach(n => n.remove());
+      const after = existingWrap.nextElementSibling;
+      existingWrap.insertAdjacentHTML("afterend", coinChartMeta(m));
+      refreshDexInfo(m);
+      renderHeader();
+    } catch (e) {}
+    return;
+  }
+  // Park live iframe before wiping coinBody so zoom/pan survive the 30s feed refresh.
+  el.querySelectorAll(".mc-chart-wrap[data-mint]").forEach(parkChartWrap);
   el.innerHTML = `<div class="card agcard"><div class="row"><button class="btn ghost" id="coinBack">← Back</button><span class="sp"></span><span class="badge b-paper">PAPER</span></div>
     <div style="margin-top:.6rem">${chips}</div>
-    ${liveChartHtml(chartUrl, m)}
+    ${chartSlotHtml(m)}
     <h2 style="margin:.4rem 0 .1rem">${esc(c.sym || L.sym || (R && R.sym) || shortMint(m))}</h2>${isPasted ? `<span class="stage">pasted · not tracked by the desk</span>` : ""}<div class="sm mut" style="word-break:break-all"><code>${esc(m)}</code></div>
     <div class="sm mut" id="coinUpd">price ${L.ts ? agoS(L.ts) : "loading…"} · holders ${L.rcTs ? agoS(L.rcTs) : "loading…"}</div>
     ${dexInfoPlaceholder(m)}
@@ -1310,10 +1476,11 @@ function renderCoin() {
   <div class="card agcard"><b>PAPER position</b>${ps.map(p => { const lp = p.closed ? { pnl: p.pnl } : livePnl(p);
     return `<div class="item"><div class="row"><span class="stage">${p.book === "auto" ? "auto · " + esc(p.tier) : p.book === "manual" ? "yours (logged)" : "desk"}</span><span class="sp"></span><b class="${cls(lp.pnl)}">${usd(lp.pnl, 1)}</b></div>
     <div class="sm mut">PAPER $${p.size} · entry ${px(p.entry)} · ${p.closed ? "closed " + tm(p.closed) + " · " + esc(p.reason || "") : "open since " + tm(p.opened)}</div></div>`; }).join("") || `<p class="sm mut">No PAPER position in this coin.</p>`}</div>`;
-  el.querySelectorAll("[data-pick]").forEach(n => n.onclick = () => { coinSel = n.dataset.pick; renderCoin(); fetchHolders(coinSel); fetchLive(); });
+  el.querySelectorAll("[data-pick]").forEach(n => n.onclick = () => { coinSel = n.dataset.pick; chartHoldUntil = 0; renderCoin(); fetchHolders(coinSel); fetchLive(); });
   $("coinBack").onclick = () => show(coinFrom && coinFrom !== "coin" ? coinFrom : "agents");
   renderHeader();
-  armLiveCharts($("coinBody") || $("v-coin"));
+  const slot = el.querySelector("[data-chart-slot]");
+  mountLiveChart(slot, chartUrl, m);
   refreshDexInfo(m);
 }
 function openCoin(m) { coinFrom = view; coinSel = m; show("coin"); fetchHolders(m); fetchLive(); }
@@ -1468,12 +1635,17 @@ document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => show(b.
 const _bell = $("hdrBell"); if (_bell) _bell.onclick = () => show("events");
 document.addEventListener("click", e => { const g = e.target.closest("[data-go]"); if (g) show(g.dataset.go); });
 
-// swipe between coins on the Auditor screen
-let sx = null, sy = null;
-$("v-audit").addEventListener("touchstart", e => { sx = e.touches[0].clientX; sy = e.touches[0].clientY; }, { passive: true });
+// swipe between coins on the Auditor screen (never when gesture starts on the chart)
+let sx = null, sy = null, swipeFromChart = false;
+$("v-audit").addEventListener("touchstart", e => {
+  swipeFromChart = !!(e.target && e.target.closest && e.target.closest(".mc-chart-wrap, .live-chart, .chart-fs, iframe"));
+  if (swipeFromChart) { noteChartTouch(); sx = null; return; }
+  sx = e.touches[0].clientX; sy = e.touches[0].clientY;
+}, { passive: true });
 $("v-audit").addEventListener("touchend", e => {
-  if (sx == null) return; const dx = e.changedTouches[0].clientX - sx, dy = e.changedTouches[0].clientY - sy; sx = null;
-  if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) { const n = auditList().length; if (n) { aIdx = (aIdx + (dx < 0 ? 1 : -1) + n) % n; renderAudit(); } }
+  if (swipeFromChart || sx == null) { sx = null; swipeFromChart = false; return; }
+  const dx = e.changedTouches[0].clientX - sx, dy = e.changedTouches[0].clientY - sy; sx = null;
+  if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) { const n = auditList().length; if (n) { aIdx = (aIdx + (dx < 0 ? 1 : -1) + n) % n; renderAudit(true); } }
 }, { passive: true });
 document.addEventListener("keydown", e => { if (view === "audit" && (e.key === "ArrowRight" || e.key === "ArrowLeft")) $(e.key === "ArrowRight" ? "aNext" : "aPrev")?.click(); });
 
@@ -1487,7 +1659,7 @@ let swReg = null, pushCode = localStorage.getItem("desk_push_code");
 async function registerSW() {
   if (!("serviceWorker" in navigator)) return null;
   try {
-    swReg = await navigator.serviceWorker.register("sw.js?v=18", { scope: "./" });
+    swReg = await navigator.serviceWorker.register("sw.js?v=19", { scope: "./" });
     if (swReg && swReg.update) swReg.update().catch(() => {});
     // New SW takes control → reload once so the PWA drops a blank half-cached shell.
     let refreshing = false;
@@ -1549,7 +1721,12 @@ async function refresh() {
     const prev = D && D.agentsx;
     D = await load("desk");
     try { D.agentsx = await load("agents"); } catch (e) { D.agentsx = prev || null; }
-    renderHeader(); if (view === "agents") renderAgents(true); else if (view === "coin") renderCoin(); else if (view !== "race") show(view); fetchLive();
+    renderHeader();
+    if (view === "agents") renderAgents(true);
+    else if (view === "coin") renderCoin();           // renderCoin parks/reuses chart
+    else if (view === "audit") renderAudit(false);    // soft when chart hold; never kills iframe
+    else if (view !== "race") show(view);
+    fetchLive();
   } catch (e) {
     if (!D) { $("lock").style.display = "block"; $("app").style.display = "none";
       $("lockmsg").textContent = "Cannot open the desk data - wrong or missing token. Open your secret desk link again."; }
