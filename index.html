@@ -7,7 +7,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' https: data:; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' https://api.dexscreener.com https://api.rugcheck.xyz https://api.geckoterminal.com; frame-src https://dexscreener.com https://www.dexscreener.com; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="theme-color" content="#07090c">
 <title>Desk</title>
-<!-- desk-build:20 my-wallets -->
+<!-- desk-build:22 chart-dock-fix -->
 <script>
 // set the theme before first paint; Dark / Dim / Light (legacy auto/light migrated once)
 (function () { try {
@@ -235,7 +235,7 @@ html[data-theme="light"] #v-agents,html[data-theme="light"] #v-race,html[data-th
 .pdot{display:inline-block;width:8px;height:8px;border-radius:50%;margin:0 .25rem 0 .1rem}
 .pulse{display:inline-block;width:8px;height:8px;border-radius:50%;background:#2fd27a;margin-left:.35rem;animation:pl 1.2s infinite}
 @keyframes pl{0%{box-shadow:0 0 0 0 rgba(47,210,122,.7)}70%{box-shadow:0 0 0 8px rgba(47,210,122,0)}100%{box-shadow:0 0 0 0 rgba(47,210,122,0)}}
-.trow{display:grid;grid-template-columns:1.6rem minmax(0,9.5rem) 1fr 4.2rem;align-items:center;gap:.4rem;padding:.22rem 0;font-size:.82rem}
+.rank-arrow{font-weight:700;font-size:.78rem;margin-left:.25rem}.rank-up{color:#2fd27a}.rank-down{color:#ff5468}.rank-same{color:var(--mut)}.rank-new{color:var(--mut)}.whale-rank{min-width:2.2rem;display:inline-block}.trow{display:grid;grid-template-columns:1.6rem minmax(0,9.5rem) 1fr 4.2rem;align-items:center;gap:.4rem;padding:.22rem 0;font-size:.82rem}
 .tr-n{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tr-b{height:10px;background:var(--card2);border-radius:5px;overflow:hidden}.tr-b span{display:block;height:100%;border-radius:5px}.tr-v{text-align:right}
 .tap{cursor:pointer}.agt{width:100%;font-size:.82rem;border-collapse:collapse;margin-top:.4rem}.agt td{padding:.2rem 0}.agt td:not(:first-child){text-align:right}
 .mbars{display:flex;gap:.3rem;overflow-x:auto;margin-top:.5rem}.mb{flex:1 0 54px;text-align:center}.mbv{height:74px;display:flex;align-items:flex-end;justify-content:center}.mbv span{width:60%;border-radius:4px 4px 0 0}
@@ -476,177 +476,198 @@ function coinAlertsHtml(mint, n) {
     return `<span class="chip${fire ? " fire" : ""}">${esc(label)} · ${esc(when)}</span>`;
   }).join("")}</div>`;
 }
-// ---- Live Dex chart: keep the SAME iframe across feed refreshes (zoom/pan survive) ----
+// ---- Live Dex chart (Android-safe): NEVER move an iframe in the DOM ----
+// Moving iframe nodes (park.appendChild / replaceWith / fullscreen reparent) reloads them and
+// often leaves a blank box on Chrome Android PWAs. Instead: persistent docks, change src only
+// when the coin/pair changes, soft feed refresh updates text only.
 const CHART_HOLD_MS = 60000;
 let chartHoldUntil = 0;
-const chartParkMap = new Map(); // mint -> .mc-chart-wrap element (live iframe)
 function chartHoldActive() { return Date.now() < chartHoldUntil; }
 function noteChartTouch() { chartHoldUntil = Date.now() + CHART_HOLD_MS; }
+
 function chartSlotHtml(mint) {
+  // Legacy placeholder — docks replace this; kept for call sites that still emit a slot.
   return `<div class="chart-slot" data-chart-slot="${esc(mint || "")}"></div>`;
 }
-function liveChartHtml(chartUrl, mint) {
-  // DexScreener embed. Eager src (no loading=lazy — blank on Android standalone PWA).
-  // referrerpolicy not no-referrer: Dex embed often stays blank without a referrer.
-  const addr = embedAddr(chartUrl, mint);
+
+function embedSrc(pairOrMint) {
+  if (!pairOrMint || !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(pairOrMint)) return null;
   const th = chartTheme();
-  const open = chartBtn(chartUrl) || (addr ? chartBtn("https://dexscreener.com/solana/" + addr) : "");
-  if (!addr) {
-    return `<div class="mc-chart-wrap" data-mint="${esc(mint || "")}"><div class="chart-toolbar"><button type="button" class="btn ghost chart-fs-btn" disabled>⛶ Full screen</button></div>
-      <div class="chart-miss mut sm">Chart unavailable – Open chart</div>
-      <div class="chart-fallback">${open}</div></div>`;
+  return `https://dexscreener.com/solana/${pairOrMint}?embed=1&theme=${th}&chartTheme=${th}&info=0&trades=0&chartLeftToolbar=0&interval=5`;
+}
+
+/** Highest-liquidity DexScreener pair where mint is the base token. Falls back to mint. */
+async function resolveChartAddr(mint, hintUrl) {
+  // Prefer hint if it already is a pair address different from the mint (desk chart_url).
+  let hint = null;
+  if (typeof hintUrl === "string") {
+    const m = hintUrl.match(/^https:\/\/dexscreener\.com\/solana\/([1-9A-HJ-NP-Za-km-z]{32,44})/);
+    if (m) hint = m[1];
   }
-  const src = `https://dexscreener.com/solana/${addr}?embed=1&theme=${th}&chartTheme=${th}&info=0&trades=0&chartLeftToolbar=0&interval=5`;
-  return `<div class="mc-chart-wrap" data-mint="${esc(mint || "")}" data-chart-src="${esc(src)}">
-    <div class="chart-toolbar"><button type="button" class="btn ghost chart-fs-btn" data-chart-fs>⛶ Full screen</button></div>
+  try {
+    const pair = await fetchDexPair(mint);
+    const addr = pair && pair.pairAddress;
+    if (addr && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(addr)) {
+      if (typeof LIVE !== "undefined") {
+        LIVE[mint] = Object.assign(LIVE[mint] || {}, { pair: addr, chartPair: addr });
+      }
+      return addr;
+    }
+  } catch (e) {}
+  // Prefer a non-mint hint (likely a pool) over embedding the mint itself.
+  if (hint && hint !== mint) return hint;
+  if (hint) return hint;
+  return mint || null;
+}
+
+function buildChartWrap(mint) {
+  const open = chartBtn("https://dexscreener.com/solana/" + (mint || ""));
+  const wrap = document.createElement("div");
+  wrap.className = "mc-chart-wrap";
+  wrap.setAttribute("data-mint", mint || "");
+  wrap.innerHTML = `<div class="chart-toolbar"><button type="button" class="btn ghost chart-fs-btn" data-chart-fs>⛶ Full screen</button></div>
     <div class="live-chart" data-live-chart>
       <div class="chart-loading">Loading chart…</div>
       <iframe title="Live price chart" allow="clipboard-write; fullscreen" referrerpolicy="strict-origin-when-cross-origin"></iframe>
     </div>
-    <div class="chart-fallback" hidden><span class="sm mut">Chart unavailable –</span>${open || `<a class="btn ghost" href="${esc(src.split("?")[0])}" target="_blank" rel="noopener noreferrer">Open chart</a>`}</div>
-  </div>`;
-}
-function ensureChartPark() {
-  let park = $("chartPark");
-  if (!park) {
-    park = document.createElement("div");
-    park.id = "chartPark";
-    park.setAttribute("aria-hidden", "true");
-    document.body.appendChild(park);
-  }
-  return park;
-}
-function parkChartWrap(wrap) {
-  if (!wrap) return;
-  const mint = wrap.getAttribute("data-mint") || "";
-  if (!mint) return;
-  const park = ensureChartPark();
-  const iframe = wrap.querySelector("iframe");
-  const src = iframe && (iframe.getAttribute("src") || iframe.src || "");
-  if (iframe && src) {
-    chartParkMap.set(mint, wrap);
-    park.appendChild(wrap); // moves node; iframe stays alive, no reload
-  }
-}
-function armLiveCharts(root) {
-  const scope = root && root.querySelectorAll ? root : document;
-  scope.querySelectorAll("[data-live-chart]").forEach(box => {
-    const wrap = box.closest(".mc-chart-wrap");
-    const iframe = box.querySelector("iframe");
-    const fallback = wrap && wrap.querySelector(".chart-fallback");
-    const src = wrap && wrap.getAttribute("data-chart-src");
-    if (!iframe || !src) return;
-    // Touch / pointer on chart → hold card re-renders so zoom/pan survive feed polls.
-    if (box.dataset.holdBound !== "1") {
-      box.dataset.holdBound = "1";
-      const hold = () => noteChartTouch();
-      box.addEventListener("touchstart", hold, { passive: true });
-      box.addEventListener("pointerdown", hold, { passive: true });
-      wrap && wrap.addEventListener("touchstart", hold, { passive: true });
-    }
-    // Full screen button
-    const fsBtn = wrap && wrap.querySelector("[data-chart-fs]");
-    if (fsBtn && fsBtn.dataset.bound !== "1") {
-      fsBtn.dataset.bound = "1";
-      fsBtn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); openChartFullscreen(wrap); };
-    }
-    if (box.dataset.armed === "1") {
-      // Already armed: NEVER touch iframe.src (re-assigning reloads and kills zoom).
-      return;
-    }
-    box.dataset.armed = "1";
-    let settled = false;
-    const ok = () => {
-      if (settled) return; settled = true;
-      box.classList.add("is-ready"); box.classList.remove("is-failed");
-      if (fallback) fallback.hidden = true;
-    };
-    const fail = () => {
-      if (settled) return; settled = true;
-      box.classList.add("is-failed"); box.classList.remove("is-ready");
-      iframe.style.display = "none";
-      if (fallback) fallback.hidden = false;
-    };
-    iframe.addEventListener("load", ok, { once: true });
-    iframe.addEventListener("error", fail, { once: true });
-    // Set src once only. Retries without changing src string.
-    const cur = iframe.getAttribute("src") || "";
-    if (!cur) {
-      try { iframe.src = src; } catch (e) { fail(); }
-      // One delayed assign ONLY if still empty (standalone PWA race) — never if already set.
-      setTimeout(() => {
-        if (!(iframe.getAttribute("src") || iframe.src)) {
-          try { iframe.src = src; } catch (e) { fail(); }
-        }
-      }, 250);
-    } else {
-      ok();
-    }
-    setTimeout(() => { if (!settled && !(iframe.getAttribute("src") || iframe.src)) fail(); }, 8000);
-  });
-}
-/** Place a live chart into a slot: reuse parked iframe for same mint (no reload). */
-function mountLiveChart(slotEl, chartUrl, mint) {
-  if (!slotEl) return;
-  const mintKey = mint || "";
-  // Prefer parked wrap for this mint (keeps zoom / same iframe element).
-  let wrap = mintKey ? chartParkMap.get(mintKey) : null;
-  if (wrap && wrap.querySelector && wrap.querySelector("iframe")) {
-    // Re-attach even if briefly disconnected; Map is source of truth.
-    chartParkMap.delete(mintKey);
-    try { slotEl.replaceWith(wrap); } catch (e) { slotEl.parentElement && slotEl.parentElement.replaceChild(wrap, slotEl); }
-    armLiveCharts(wrap); // no-ops src if already armed
-    return wrap;
-  }
-  // Build fresh only when we have no parked iframe.
-  const tmp = document.createElement("div");
-  tmp.innerHTML = liveChartHtml(chartUrl, mint);
-  wrap = tmp.firstElementChild;
-  slotEl.replaceWith(wrap);
-  armLiveCharts(wrap);
+    <div class="chart-fallback" hidden><span class="sm mut">Chart unavailable –</span>${open || ""}</div>`;
   return wrap;
 }
+
+function bindChartChrome(wrap) {
+  if (!wrap || wrap.dataset.chromeBound === "1") return;
+  wrap.dataset.chromeBound = "1";
+  const box = wrap.querySelector("[data-live-chart]");
+  const hold = () => noteChartTouch();
+  if (box) {
+    box.addEventListener("touchstart", hold, { passive: true });
+    box.addEventListener("pointerdown", hold, { passive: true });
+  }
+  wrap.addEventListener("touchstart", hold, { passive: true });
+  const fsBtn = wrap.querySelector("[data-chart-fs]");
+  if (fsBtn) fsBtn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); openChartFullscreen(wrap); };
+}
+
+/** Set iframe.src in place. Never reparents the iframe. Returns true if src was (re)assigned. */
+function setIframeSrcInPlace(wrap, src) {
+  const box = wrap.querySelector("[data-live-chart]");
+  const iframe = box && box.querySelector("iframe");
+  const fallback = wrap.querySelector(".chart-fallback");
+  if (!iframe || !src) {
+    if (box) { box.classList.add("is-failed"); box.classList.remove("is-ready"); }
+    if (fallback) fallback.hidden = false;
+    return false;
+  }
+  bindChartChrome(wrap);
+  const cur = iframe.getAttribute("src") || "";
+  // Same src already loaded → leave it (zoom/pan survive).
+  if (cur === src && (box.classList.contains("is-ready") || box.dataset.armed === "1")) {
+    return false;
+  }
+  box.classList.remove("is-ready", "is-failed");
+  box.dataset.armed = "1";
+  if (fallback) fallback.hidden = true;
+  iframe.style.display = "";
+  wrap.setAttribute("data-chart-src", src);
+  let settled = false;
+  const ok = () => {
+    if (settled) return; settled = true;
+    // Delay ready: Dex often fires load before paint; blank box looks "ready" otherwise.
+    setTimeout(() => {
+      box.classList.add("is-ready"); box.classList.remove("is-failed");
+      if (fallback) fallback.hidden = true;
+    }, 400);
+  };
+  const fail = () => {
+    if (settled) return; settled = true;
+    box.classList.add("is-failed"); box.classList.remove("is-ready");
+    iframe.style.display = "none";
+    if (fallback) fallback.hidden = false;
+  };
+  // One-shot listeners for THIS assign only.
+  const onLoad = () => { iframe.removeEventListener("error", onErr); ok(); };
+  const onErr = () => { iframe.removeEventListener("load", onLoad); fail(); };
+  iframe.addEventListener("load", onLoad, { once: true });
+  iframe.addEventListener("error", onErr, { once: true });
+  try { iframe.src = src; } catch (e) { fail(); return true; }
+  // Fallback: if load never fires but src stuck, show fail after 10s.
+  setTimeout(() => { if (!settled) fail(); }, 10000);
+  return true;
+}
+
+/**
+ * Ensure a chart is showing for mint inside `dock` (a stable parent that is NEVER wiped).
+ * Soft feed refresh must call this with the same mint and must not rebuild the dock.
+ */
+async function ensureDockChart(dock, mint, chartUrlHint) {
+  if (!dock || !mint) return null;
+  let wrap = dock.querySelector(".mc-chart-wrap");
+  if (!wrap) {
+    wrap = buildChartWrap(mint);
+    dock.innerHTML = "";
+    dock.appendChild(wrap);
+  } else if (wrap.getAttribute("data-mint") !== mint) {
+    // Different coin: keep the SAME iframe element, just change mint + src (no reparent).
+    wrap.setAttribute("data-mint", mint);
+    const iframe = wrap.querySelector("iframe");
+    if (iframe) { try { iframe.removeAttribute("src"); iframe.src = "about:blank"; } catch (e) {} }
+    const box = wrap.querySelector("[data-live-chart]");
+    if (box) { box.classList.remove("is-ready", "is-failed"); box.dataset.armed = ""; }
+  }
+  const addr = await resolveChartAddr(mint, chartUrlHint);
+  const src = embedSrc(addr);
+  if (!src) {
+    const box = wrap.querySelector("[data-live-chart]");
+    if (box) { box.classList.add("is-failed"); }
+    return wrap;
+  }
+  setIframeSrcInPlace(wrap, src);
+  return wrap;
+}
+
+/** Legacy mount used by older call sites: resolve dock from slot or nearest dock. */
+function mountLiveChart(slotEl, chartUrl, mint) {
+  if (!slotEl) return null;
+  // Prefer an explicit dock sibling/parent.
+  let dock = slotEl.closest("[data-chart-dock]") || slotEl;
+  if (slotEl.hasAttribute("data-chart-slot")) {
+    // Turn the slot into a dock in place (first time) — do not move iframes later.
+    slotEl.removeAttribute("data-chart-slot");
+    slotEl.setAttribute("data-chart-dock", mint || "");
+    dock = slotEl;
+  }
+  ensureDockChart(dock, mint, chartUrl);
+  return dock.querySelector(".mc-chart-wrap");
+}
+
+// No-op park: moving iframes blanks them on Android. Soft refresh must not call this to relocate.
+function parkChartWrap(wrap) {
+  // Intentionally empty — kept so old call sites do not throw.
+  if (wrap) noteChartTouch();
+}
+
+/** Fullscreen via CSS class on the wrap — never reparent the iframe. */
 function openChartFullscreen(wrap) {
   if (!wrap) return;
   noteChartTouch();
-  let fs = $("chartFs");
-  if (!fs) {
-    fs = document.createElement("div");
-    fs.id = "chartFs";
-    fs.className = "chart-fs";
-    fs.hidden = true;
-    fs.innerHTML = `<div class="chart-fs-bar"><b class="sm">Chart</b><span class="sp"></span><button type="button" class="btn" id="chartFsClose">Close</button></div><div class="chart-fs-body" id="chartFsBody"></div>`;
-    document.body.appendChild(fs);
-    $("chartFsClose").onclick = closeChartFullscreen;
+  document.querySelectorAll(".mc-chart-wrap.is-fs").forEach(w => w.classList.remove("is-fs"));
+  wrap.classList.add("is-fs");
+  let bar = wrap.querySelector(".chart-fs-closebar");
+  if (!bar) {
+    bar = document.createElement("div");
+    bar.className = "chart-fs-closebar";
+    bar.innerHTML = `<b class="sm">Chart</b><span class="sp"></span><button type="button" class="btn" data-fs-close>Close</button>`;
+    wrap.insertBefore(bar, wrap.firstChild);
+    bar.querySelector("[data-fs-close]").onclick = (e) => { e.preventDefault(); closeChartFullscreen(); };
   }
-  const body = $("chartFsBody");
-  // Placeholder keeps the card slot; move the SAME wrap (iframe) into fullscreen.
-  const ph = document.createElement("div");
-  ph.className = "chart-slot";
-  ph.dataset.chartFsPh = "1";
-  ph.dataset.mint = wrap.getAttribute("data-mint") || "";
-  wrap._fsPlaceholder = ph;
-  if (wrap.parentElement) wrap.parentElement.insertBefore(ph, wrap);
-  body.innerHTML = "";
-  body.appendChild(wrap);
-  fs.hidden = false;
   document.body.style.overflow = "hidden";
 }
 function closeChartFullscreen() {
-  const fs = $("chartFs");
-  if (!fs) return;
-  const body = $("chartFsBody");
-  const wrap = body && body.querySelector(".mc-chart-wrap");
-  fs.hidden = true;
+  document.querySelectorAll(".mc-chart-wrap.is-fs").forEach(w => w.classList.remove("is-fs"));
   document.body.style.overflow = "";
-  if (wrap && wrap._fsPlaceholder && wrap._fsPlaceholder.parentElement) {
-    wrap._fsPlaceholder.replaceWith(wrap);
-    wrap._fsPlaceholder = null;
-  } else if (wrap) {
-    parkChartWrap(wrap);
-  }
   noteChartTouch();
 }
+
 function coinChartMeta(mint) {
   if (!mint) return "";
   return `${mcLevelStrip(mint)}${coinAlertsHtml(mint, 5)}`;
@@ -898,7 +919,8 @@ function renderAudit(force) {
   const a = L[aIdx], ok = a.banner === "Cleared";
   // Soft refresh while Mike is zooming: update text only, never touch the iframe.
   const acard = $("acard");
-  const liveWrap = acard && acard.querySelector(`.mc-chart-wrap[data-mint="${a.mint}"]`);
+  const liveWrap = ($("auditChartDock") && $("auditChartDock").querySelector(`.mc-chart-wrap[data-mint="${a.mint}"]`))
+    || (acard && acard.querySelector(`.mc-chart-wrap[data-mint="${a.mint}"]`));
   if (!force && chartHoldActive() && liveWrap && acard) {
     try {
       const pill = acard.querySelector(".pill");
@@ -930,14 +952,21 @@ function renderAudit(force) {
     const main = (a.reasons[0] || (a.rows.find(r => r.ok === false) || {}).label || "failed checks").split(" - ")[0];
     verdict = `Rejected · ${esc(main)} · desk won't buy ${esc(a.sym || shortMint(a.mint))}`;
   }
-  // Park any live chart BEFORE wiping the pane (keeps iframe + zoom).
-  document.querySelectorAll("#auditPane .mc-chart-wrap[data-mint]").forEach(parkChartWrap);
+  // Keep a persistent audit chart dock outside the wiped card (iframe never moved).
+  let auditDock = $("auditChartDock");
+  if (!auditDock) {
+    auditDock = document.createElement("div");
+    auditDock.id = "auditChartDock";
+    auditDock.setAttribute("data-chart-dock", "");
+    const pane = $("auditPane");
+    if (pane && pane.parentElement) pane.parentElement.insertBefore(auditDock, pane);
+    else document.body.appendChild(auditDock);
+  }
   $("auditPane").innerHTML = `
     <div class="counters"><div class="counter"><b>${L.length}</b><span>Taken apart</span></div>
       <div class="counter"><b class="red">${L.length - nOk}</b><span>Rejected</span></div>
       <div class="counter"><b class="grn">${nOk}</b><span>Cleared</span></div></div>
     <div class="card" id="acard">
-      ${chartSlotHtml(a.mint)}
       <div class="coin">${logo(a)}<div><div style="font-weight:800;font-size:1.15rem">${esc(a.sym || "?")}</div>
         <div class="sm mut">${esc(a.name || "")}</div><div class="sm mut">${esc(shortMint(a.mint))} · Solana · ${ago(a.ts)}</div></div>
         <span class="pill ${ok ? "p-ok" : "p-bad"}">${ok ? "Cleared" : "Rejected"}</span></div>
@@ -959,8 +988,7 @@ function renderAudit(force) {
   document.querySelectorAll(".dots i").forEach(d => d.onclick = () => { aIdx = +d.dataset.i; renderAudit(true); });
   renderSplitTrades();
   renderHeader();
-  const slot = document.querySelector("#acard [data-chart-slot]");
-  mountLiveChart(slot, a.chart_url, a.mint);
+  ensureDockChart($("auditChartDock"), a.mint, a.chart_url);
   refreshDexInfo(a.mint);
 }
 function renderSplitTrades() { $("splitTrades").innerHTML = tradesHtml(true); }
@@ -1154,16 +1182,29 @@ function eqSvg(pts) {
   return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:90px"><line x1="0" x2="${W}" y1="${Y(0)}" y2="${Y(0)}" stroke="currentColor" stroke-opacity=".2"/>
     <polyline points="${line}" fill="none" stroke="${last >= 0 ? "#3fb950" : "#f85149"}" stroke-width="2"/></svg>`;
 }
+
+function rankArrow(d, change) {
+  if (d == null || d === "unknown") return `<span class="rank-arrow rank-same" title="rank change unknown">·</span>`;
+  if (d === "new") return `<span class="rank-arrow rank-new" title="new on list">new</span>`;
+  if (d === "same" || change === 0) return `<span class="rank-arrow rank-same" title="same rank">→</span>`;
+  if (typeof d === "string" && d.startsWith("up")) return `<span class="rank-arrow rank-up" title="up ${Math.abs(change||0)}">▲${Math.abs(change||0)}</span>`;
+  if (typeof d === "string" && d.startsWith("down")) return `<span class="rank-arrow rank-down" title="down ${Math.abs(change||0)}">▼${Math.abs(change||0)}</span>`;
+  if (change > 0) return `<span class="rank-arrow rank-up">▲${change}</span>`;
+  if (change < 0) return `<span class="rank-arrow rank-down">▼${Math.abs(change)}</span>`;
+  return `<span class="rank-arrow rank-same">→</span>`;
+}
 function renderWhales() {
   const V = D.whales;
   if (!V) { $("v-whales").innerHTML = `<div class="card mut">No followed wallets yet.</div>`; return; }
   const eq = V.equity || {};
-  const w = V.wallets.map(x => `<div class="item"><div class="row"><b>#${x.rank} ${esc(x.handle)}</b>
+  const topN = V.top_n || V.wallets.length;
+  const w = V.wallets.map(x => `<div class="item"><div class="row"><b><span class="whale-rank">#${x.rank}</span> ${esc(x.handle)}</b>${rankArrow(x.rank_delta, x.rank_change)}
       <span class="stage ${x.label === "sniper / short holder" ? "st-rejected" : x.label === "consistent winner" ? "st-held" : ""}">${esc(x.label)}</span>
       ${x.today ? `<span class="stage st-watch">today</span>` : ""}<span class="sp"></span><span class="score ${x.score >= 60 ? "hi" : "lo"}">${Math.round(x.score)}</span></div>
       <div class="sm mut">${esc(x.platforms || "")} · win ${x.win_rate != null ? Math.round(x.win_rate * 100) + "%" : "–"} · hold ${x.hold_min != null ? Math.round(x.hold_min) + " min" : "–"}
+      · 7d #${x.rank_7d != null ? x.rank_7d : "n/a"} · 30d #${x.rank_30d != null ? x.rank_30d : "n/a"}
       · <a href="${esc(x.gmgn)}" target="_blank" rel="noopener">${esc(shortMint(x.wallet))}</a></div></div>`).join("");
-  const hot = V.hot.map(c => `<div class="item"><div class="row"><b>${esc(c.sym || shortMint(c.mint))}</b>
+  const hot = V.hot.map(c => `<div class="item"><div class="row"><b><span class="whale-rank">#${c.rank || "?"}</span> ${esc(c.sym || shortMint(c.mint))}</b>${rankArrow(c.rank_delta, c.rank_change)}
       <span class="stage">${c.buyers} wallets</span><span class="sp"></span><b class="${cls(c.move_pct)}">${pct(c.move_pct)}</b></div>
       <div class="sm mut">$${Math.round(c.usd).toLocaleString()} bought · avg ${px(c.avg_px)} → now ${px(c.now)} · ${ago(c.last)}</div>
       <div class="row" style="margin-top:.4rem;gap:.35rem;flex-wrap:wrap"><span class="sp"></span>${chartBtn(c.chart_url)}${fomoBtn(c.link, true)}${holdersBtns(c.mint, true)}</div></div>`).join("");
@@ -1191,7 +1232,7 @@ function renderWhales() {
       ${eqSvg(eq.points)}</div>
     <div class="card"><b>Hot coins (most bought by followed wallets, 24h)</b>${hot || `<p class="sm mut">No buys yet.</p>`}</div>
     <div class="card"><b>Live log</b><ul class="plain" style="margin-top:.4rem">${lg || `<li class="mut">Nothing yet.</li>`}</ul></div>
-    <div class="card"><b>Followed wallets (top ${V.wallets.length})</b>${w}</div>`;
+    <div class="card"><b>Top ${topN} traders</b><p class="sm mut" style="margin:.25rem 0 .4rem">Ranked by desk follow score · ▲/▼ = change since last daily board refresh · 7d/30d = best board rank that window · desk still follows the wider list for alerts</p>${w}</div>`;
 }
 
 // ================= Agents tab (agentsview.py) · PAPER only, real desk data, nothing here trades =================
@@ -1396,8 +1437,17 @@ function traderView(t) {
     <div class="kv3" style="margin-top:.7rem"><div><b class="${cls(t.pnl)}">${kusd(t.pnl)}</b><span class="mut sm">~6-month realized PnL</span></div>
       <div><b>${t.win_rate != null ? Math.round(t.win_rate * 100) + "%" : "–"}</b><span class="mut sm">win rate (${t.wins ?? "–"}W/${t.losses ?? "–"}L)</span></div>
       <div><b>${t.hold_min != null ? Math.round(t.hold_min) + " min" : "–"}</b><span class="mut sm">avg (median) hold</span></div></div>
-    <div class="sm" style="margin-top:.5rem">Score ${t.score != null ? Math.round(t.score) : "–"} · consistency ${t.consistency ?? "–"} · ${esc(t.label || "–")} · ${t.followed ? `followed #${t.rank}` : "not followed"}</div>
+    <div class="sm" style="margin-top:.5rem">Score ${t.score != null ? Math.round(t.score) : "–"} · consistency ${t.consistency ?? "–"} · ${esc(t.label || "–")} · ${t.followed ? `followed #${t.rank}` : "not followed"}${t.rank != null ? " " + "" : ""}</div>
+    <div class="sm">Desk rank #${t.rank ?? "n/a"} ${rankArrow(t.rank_delta, t.rank_change)}${t.rank_prev != null ? ` <span class="mut">(was #${t.rank_prev})</span>` : ""}</div>
     <div class="sm mut">${esc(t.boards.join(" · "))}</div></div>
+  <div class="card agcard"><b>Portfolio (read-only)</b>
+    <p class="sm mut">${esc(t.portfolio_status || "unknown")}${t.portfolio_total_usd != null ? ` · ~$${Number(t.portfolio_total_usd).toLocaleString()}` : ""}${t.extras_at ? ` · ${esc(String(t.extras_at))}` : ""} · public balances only, never connects</p>
+    ${(t.portfolio || []).map(h => `<div class="row sm" style="margin-top:.3rem;flex-wrap:wrap;gap:.3rem"><b>${esc(h.sym || "n/a")}</b><span class="sp"></span>${h.amount != null ? Number(h.amount).toLocaleString(undefined,{maximumFractionDigits:4}) : "n/a"} · ${h.usd != null ? "~$"+Number(h.usd).toFixed(2) : "n/a"} ${holdersBtns(h.mint, true)}</div>`).join("") || `<p class="sm mut">${(t.portfolio_status === "ok") ? "No priced meme holdings above dust." : "Portfolio unknown (not fetched yet or RPC failed)."}</p>`}
+  </div>
+  <div class="card agcard"><b>Linked / shared wallets</b>
+    <p class="sm mut">${esc(t.linked_status || "unknown")} · only wallets with real direct SOL/token transfers · unclear = unknown</p>
+    ${(t.linked || []).map(l => `<div class="row sm" style="margin-top:.3rem"><a href="${esc(l.solscan || ("https://solscan.io/account/"+l.wallet))}" target="_blank" rel="noopener">${esc(shortMint(l.wallet))}</a><span class="sp"></span><span class="mut">${l.evidence != null ? l.evidence + " transfers" : "unknown"}</span></div>`).join("") || `<p class="sm mut">${(t.linked_status === "ok") ? "No linked wallets found in recent signatures." : "Linked wallets unknown."}</p>`}
+  </div>
   <div class="card agcard"><b>Wins / losses per month</b><div class="mbars">${bars || `<p class="sm mut">No monthly history for this wallet.</p>`}</div></div>
   <div class="card agcard"><b>Recent buys / sells</b>${t.recent.map(r => {
     const m = r.mint;
@@ -1459,12 +1509,19 @@ function renderCoin() {
   if (!$("coinBody")) {
     root.innerHTML = `<div class="card agcard"><b>Paste a mint</b><div class="sm mut">Any Solana coin: live chart, holders, bubble map and rug check from the same public APIs. Read-only, no buy button.</div>
       <div class="row" style="gap:.4rem;margin-top:.5rem"><input id="pasteIn" placeholder="Solana mint address" autocomplete="off" spellcheck="false" style="flex:1;min-width:0"><button class="btn" id="pasteGo">Show</button></div>
-      <div class="sm mut" id="pasteMsg"></div></div><div id="coinBody"></div>`;
+      <div class="sm mut" id="pasteMsg"></div></div>
+      <div id="coinBody"><div id="coinTop"></div><div id="coinChartDock" data-chart-dock></div><div id="coinRest"></div></div>`;
     $("pasteGo").onclick = () => pasteMint($("pasteIn").value);
     $("pasteIn").onkeydown = e => { if (e.key === "Enter") pasteMint(e.target.value); };
     $("pasteIn").onpaste = e => setTimeout(() => pasteMint(e.target.value), 0);
   }
-  const el = $("coinBody");
+  // Ensure dock/rest exist even if an older session left a flat coinBody.
+  if (!$("coinChartDock") || !$("coinRest") || !$("coinTop")) {
+    $("coinBody").innerHTML = `<div id="coinTop"></div><div id="coinChartDock" data-chart-dock></div><div id="coinRest"></div>`;
+  }
+  const el = $("coinRest");
+  const chartDock = $("coinChartDock");
+  const coinTop = $("coinTop");
   const list = coinList(A); const m = coinSel || (list[0] || [])[0];
   if (!m) { el.innerHTML = `<div class="card agcard">No open PAPER positions or alert coins yet. Paste a mint above.</div>`; return; }
   coinSel = m;
@@ -1496,25 +1553,24 @@ function renderCoin() {
   const devPct = R && R.creatorBalance != null && sup ? R.creatorBalance / 10 ** (R.decimals || 0) / sup * 100 : (c.dev_pct != null ? +c.dev_pct : null);
   const chartUrl = (ps[0] || {}).chart_url || (c.link && null) || (pair ? ("https://dexscreener.com/solana/" + pair) : null);
   // Soft refresh while zooming: keep the same iframe, update surrounding text only.
-  const existingWrap = el.querySelector(`.mc-chart-wrap[data-mint="${m}"]`);
+  const existingWrap = chartDock && chartDock.querySelector(`.mc-chart-wrap[data-mint="${m}"]`);
   if (chartHoldActive() && existingWrap) {
     try {
       const upd = $("coinUpd");
       if (upd) upd.textContent = `price ${L.ts ? agoS(L.ts) : "loading…"} · holders ${L.rcTs ? agoS(L.rcTs) : "loading…"}`;
       el.querySelectorAll(".mc-strip, .mc-alerts").forEach(n => n.remove());
-      const after = existingWrap.nextElementSibling;
-      existingWrap.insertAdjacentHTML("afterend", coinChartMeta(m));
+      const afterH2 = el.querySelector("h2");
+      if (afterH2) afterH2.insertAdjacentHTML("afterend", coinChartMeta(m));
+      else el.insertAdjacentHTML("afterbegin", coinChartMeta(m));
       refreshDexInfo(m);
       renderHeader();
     } catch (e) {}
     return;
   }
-  // Park live iframe before wiping coinBody so zoom/pan survive the 30s feed refresh.
-  el.querySelectorAll(".mc-chart-wrap[data-mint]").forEach(parkChartWrap);
-  el.innerHTML = `<div class="card agcard"><div class="row"><button class="btn ghost" id="coinBack">← Back</button><span class="sp"></span><span class="badge b-paper">PAPER</span></div>
-    <div style="margin-top:.6rem">${chips}</div>
-    ${chartSlotHtml(m)}
-    <h2 style="margin:.4rem 0 .1rem">${esc(c.sym || L.sym || (R && R.sym) || shortMint(m))}</h2>${isPasted ? `<span class="stage">pasted · not tracked by the desk</span>` : ""}<div class="sm mut" style="word-break:break-all"><code>${esc(m)}</code></div>
+  // Chips above chart; wipe text only — chart dock stays put (iframe never moved).
+  coinTop.innerHTML = `<div class="card agcard" style="margin-bottom:0"><div class="row"><button class="btn ghost" id="coinBack">← Back</button><span class="sp"></span><span class="badge b-paper">PAPER</span></div>
+    <div style="margin-top:.6rem">${chips}</div></div>`;
+  el.innerHTML = `<div class="card agcard"><h2 style="margin:.2rem 0 .1rem">${esc(c.sym || L.sym || (R && R.sym) || shortMint(m))}</h2>${isPasted ? `<span class="stage">pasted · not tracked by the desk</span>` : ""}<div class="sm mut" style="word-break:break-all"><code>${esc(m)}</code></div>
     <div class="sm mut" id="coinUpd">price ${L.ts ? agoS(L.ts) : "loading…"} · holders ${L.rcTs ? agoS(L.rcTs) : "loading…"}</div>
     ${dexInfoPlaceholder(m)}
     ${coinChartMeta(m)}
@@ -1539,11 +1595,12 @@ function renderCoin() {
   <div class="card agcard"><b>PAPER position</b>${ps.map(p => { const lp = p.closed ? { pnl: p.pnl } : livePnl(p);
     return `<div class="item"><div class="row"><span class="stage">${p.book === "auto" ? "auto · " + esc(p.tier) : p.book === "manual" ? "yours (logged)" : "desk"}</span><span class="sp"></span><b class="${cls(lp.pnl)}">${usd(lp.pnl, 1)}</b></div>
     <div class="sm mut">PAPER $${p.size} · entry ${px(p.entry)} · ${p.closed ? "closed " + tm(p.closed) + " · " + esc(p.reason || "") : "open since " + tm(p.opened)}</div></div>`; }).join("") || `<p class="sm mut">No PAPER position in this coin.</p>`}</div>`;
-  el.querySelectorAll("[data-pick]").forEach(n => n.onclick = () => { coinSel = n.dataset.pick; chartHoldUntil = 0; renderCoin(); fetchHolders(coinSel); fetchLive(); });
-  $("coinBack").onclick = () => show(coinFrom && coinFrom !== "coin" ? coinFrom : "agents");
+  (coinTop || el).querySelectorAll("[data-pick]").forEach(n => n.onclick = () => { coinSel = n.dataset.pick; chartHoldUntil = 0; renderCoin(); fetchHolders(coinSel); fetchLive(); });
+  const back = $("coinBack"); if (back) back.onclick = () => show(coinFrom && coinFrom !== "coin" ? coinFrom : "agents");
   renderHeader();
-  const slot = el.querySelector("[data-chart-slot]");
-  mountLiveChart(slot, chartUrl, m);
+  // Chart lives in #coinChartDock ABOVE the text card — never reparented on chip switches.
+  ensureDockChart(chartDock, m, chartUrl);
+  // Put dock visually under chips: move dock node before coinRest card content area via CSS order.
   refreshDexInfo(m);
 }
 function openCoin(m) { coinFrom = view; coinSel = m; show("coin"); fetchHolders(m); fetchLive(); }
@@ -1723,7 +1780,7 @@ let swReg = null, pushCode = localStorage.getItem("desk_push_code");
 async function registerSW() {
   if (!("serviceWorker" in navigator)) return null;
   try {
-    swReg = await navigator.serviceWorker.register("sw.js?v=20", { scope: "./" });
+    swReg = await navigator.serviceWorker.register("sw.js?v=22", { scope: "./" });
     if (swReg && swReg.update) swReg.update().catch(() => {});
     // New SW takes control → reload once so the PWA drops a blank half-cached shell.
     let refreshing = false;
