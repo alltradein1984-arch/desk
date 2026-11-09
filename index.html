@@ -262,6 +262,7 @@ html[data-theme="light"] #v-agents,html[data-theme="light"] #v-race,html[data-th
   <button data-v="events"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5"/><path d="M9 17a3 3 0 0 0 6 0"/></svg>Alerts</button>
 </nav>
 <div id="lock"><h2>Locked</h2><p class="mut" id="lockmsg">Open your secret desk link (the one ending in #t=…) once on this device.</p></div>
+<div id="chartPark" aria-hidden="true"></div>
 <main id="app">
   <section class="view" id="v-agents"></section>
   <section class="view" id="v-race"></section>
@@ -500,17 +501,26 @@ function liveChartHtml(chartUrl, mint) {
     <div class="chart-fallback" hidden><span class="sm mut">Chart unavailable –</span>${open || `<a class="btn ghost" href="${esc(src.split("?")[0])}" target="_blank" rel="noopener noreferrer">Open chart</a>`}</div>
   </div>`;
 }
+function ensureChartPark() {
+  let park = $("chartPark");
+  if (!park) {
+    park = document.createElement("div");
+    park.id = "chartPark";
+    park.setAttribute("aria-hidden", "true");
+    document.body.appendChild(park);
+  }
+  return park;
+}
 function parkChartWrap(wrap) {
   if (!wrap) return;
   const mint = wrap.getAttribute("data-mint") || "";
   if (!mint) return;
-  const park = $("chartPark");
-  if (!park) return;
-  // Only park a wrap that already has a live iframe (armed/ready) so we can reuse it.
+  const park = ensureChartPark();
   const iframe = wrap.querySelector("iframe");
-  if (iframe && (iframe.getAttribute("src") || iframe.src)) {
+  const src = iframe && (iframe.getAttribute("src") || iframe.src || "");
+  if (iframe && src) {
     chartParkMap.set(mint, wrap);
-    park.appendChild(wrap);
+    park.appendChild(wrap); // moves node; iframe stays alive, no reload
   }
 }
 function armLiveCharts(root) {
@@ -574,19 +584,14 @@ function armLiveCharts(root) {
 function mountLiveChart(slotEl, chartUrl, mint) {
   if (!slotEl) return;
   const mintKey = mint || "";
-  // Prefer parked wrap for this mint (keeps zoom).
-  let wrap = mintKey && chartParkMap.get(mintKey);
-  if (wrap && wrap.isConnected && wrap.parentElement && wrap.parentElement.id === "chartPark") {
+  // Prefer parked wrap for this mint (keeps zoom / same iframe element).
+  let wrap = mintKey ? chartParkMap.get(mintKey) : null;
+  if (wrap && wrap.querySelector && wrap.querySelector("iframe")) {
+    // Re-attach even if briefly disconnected; Map is source of truth.
     chartParkMap.delete(mintKey);
-    slotEl.replaceWith(wrap);
-    armLiveCharts(wrap);
+    try { slotEl.replaceWith(wrap); } catch (e) { slotEl.parentElement && slotEl.parentElement.replaceChild(wrap, slotEl); }
+    armLiveCharts(wrap); // no-ops src if already armed
     return wrap;
-  }
-  // Prefer an already-visible wrap in this card for same mint.
-  const host = slotEl.parentElement;
-  if (host) {
-    const existing = host.querySelector(`.mc-chart-wrap[data-mint="${CSS.escape ? CSS.escape(mintKey) : mintKey}"]`);
-    if (existing && existing.querySelector("iframe[src], iframe[src='']") === null) { /* fallthrough */ }
   }
   // Build fresh only when we have no parked iframe.
   const tmp = document.createElement("div");
@@ -610,17 +615,13 @@ function openChartFullscreen(wrap) {
     $("chartFsClose").onclick = closeChartFullscreen;
   }
   const body = $("chartFsBody");
-  // Move the SAME wrap into fullscreen (no iframe reload).
-  wrap.dataset.fsHome = "1";
-  if (!wrap._fsPlaceholder) {
-    const ph = document.createElement("div");
-    ph.className = "chart-slot";
-    ph.dataset.chartFsPh = "1";
-    wrap._fsPlaceholder = ph;
-  }
-  if (wrap.parentElement && !wrap.parentElement.id) {
-    wrap.parentElement.insertBefore(wrap._fsPlaceholder, wrap);
-  }
+  // Placeholder keeps the card slot; move the SAME wrap (iframe) into fullscreen.
+  const ph = document.createElement("div");
+  ph.className = "chart-slot";
+  ph.dataset.chartFsPh = "1";
+  ph.dataset.mint = wrap.getAttribute("data-mint") || "";
+  wrap._fsPlaceholder = ph;
+  if (wrap.parentElement) wrap.parentElement.insertBefore(ph, wrap);
   body.innerHTML = "";
   body.appendChild(wrap);
   fs.hidden = false;
@@ -635,8 +636,8 @@ function closeChartFullscreen() {
   document.body.style.overflow = "";
   if (wrap && wrap._fsPlaceholder && wrap._fsPlaceholder.parentElement) {
     wrap._fsPlaceholder.replaceWith(wrap);
+    wrap._fsPlaceholder = null;
   } else if (wrap) {
-    // Fall back: park it so next mount reuses.
     parkChartWrap(wrap);
   }
   noteChartTouch();
