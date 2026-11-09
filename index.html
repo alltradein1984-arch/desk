@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="referrer" content="no-referrer">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' https: data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self' https://api.dexscreener.com https://api.rugcheck.xyz; frame-src https://dexscreener.com; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' https: data:; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' https://api.dexscreener.com https://api.rugcheck.xyz https://api.geckoterminal.com; frame-src https://dexscreener.com; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="theme-color" content="#07090c">
 <title>Desk</title>
 <script>
@@ -41,6 +41,22 @@ header .upd{margin-left:auto;color:var(--mut);font-size:.68rem;text-align:right;
 .live-chart{margin:0 0 .75rem;border-radius:12px;overflow:hidden;border:1px solid var(--line);background:var(--card2)}
 .live-chart iframe{display:block;width:100%;height:340px;border:0;background:transparent}
 .chart-miss{padding:.7rem .8rem;text-align:center;border:1px dashed var(--line);border-radius:12px;margin:0 0 .75rem}
+.mc-chart-wrap{margin:0 0 .75rem;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--card2)}
+.mc-chart{width:100%;height:320px}
+.mc-strip{padding:.45rem .55rem;border-top:1px solid var(--line)}
+.mc-lvs{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.3rem}
+.mc-lv{font-size:.68rem;font-weight:700;padding:.14rem .45rem;border-radius:99px;border:1px dashed var(--line);color:var(--mut);background:transparent}
+.mc-lv.fired{border-style:solid;border-color:var(--red);color:var(--red);background:rgba(255,84,104,.08)}
+html[data-theme="light"] .mc-lv.fired,html[data-theme="dim"] .mc-lv.fired{background:#fff1f2}
+.mc-alerts{display:flex;flex-wrap:wrap;gap:.3rem;padding:.45rem .55rem;border-top:1px solid var(--line)}
+.mc-alerts .chip{font-size:.68rem;font-weight:600;padding:.15rem .45rem;border-radius:99px;background:var(--card);border:1px solid var(--line);color:var(--mut)}
+.mc-alerts .chip.fire{color:var(--red);border-color:var(--red);background:transparent}
+.hdr-bell{position:relative;background:var(--card2);color:var(--txt);border:1px solid var(--line);border-radius:99px;font-size:.72rem;padding:.18rem .55rem;cursor:pointer;flex:none}
+.hdr-bell .dot{position:absolute;top:-3px;right:-3px;min-width:16px;height:16px;padding:0 4px;border-radius:99px;background:var(--red);color:#fff;font-size:.62rem;font-weight:800;display:flex;align-items:center;justify-content:center;line-height:1}
+.hdr-bell .dot[hidden]{display:none!important}
+.alert-item{padding:.65rem 0;border-bottom:1px solid var(--line)}.alert-item:last-child{border:0}
+.alert-item.unread{background:rgba(255,84,104,.06)}
+html[data-theme="light"] .alert-item.unread,html[data-theme="dim"] .alert-item.unread{background:#fff1f2}
 .badge{font-size:.7rem;font-weight:700;padding:.15rem .5rem;border-radius:99px;letter-spacing:.06em}
 .b-paper{background:#2a2410;color:var(--amb);border:1px solid #5a4614}.b-live{background:#2a1015;color:var(--red);border:1px solid #5a1a24}
 main{max-width:1280px;margin:0 auto;padding:1rem}
@@ -196,6 +212,7 @@ html[data-theme="light"] #v-agents,html[data-theme="light"] #v-race,html[data-th
 <body>
 <header>
   <h1>DESK</h1><span id="mode" class="badge b-paper">…</span>
+  <button type="button" class="hdr-bell" id="hdrBell" title="Alerts">🔔<span class="dot" id="hdrBellDot" hidden>0</span></button>
   <span id="hdrCoin" class="hdr-coin" hidden>
     <a class="hdr-btn" id="hdrWallets" target="_blank" rel="noopener noreferrer">Wallets</a>
     <a class="hdr-btn" id="hdrBubble" target="_blank" rel="noopener noreferrer">Bubble</a>
@@ -212,7 +229,7 @@ html[data-theme="light"] #v-agents,html[data-theme="light"] #v-race,html[data-th
   <button data-v="whales"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 13c0 4 4 6 9 6s9-3 9-8c0-2-1-3-2-3-2 0-2 3-5 3S9 8 6 8c-2 0-3 2-3 5z"/><path d="M19 8c0-2 1-3 2-4"/></svg>Whales</button>
   <button data-v="coin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 18l5-6 4 3 7-9"/><circle cx="20" cy="6" r="1.5"/></svg>Coin</button>
   <button data-v="race"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V4M8 8h10M8 12h6M8 16h12"/></svg>Race</button>
-  <button data-v="events"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Events</button>
+  <button data-v="events"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5"/><path d="M9 17a3 3 0 0 0 6 0"/></svg>Alerts</button>
 </nav>
 <div id="lock"><h2>Locked</h2><p class="mut" id="lockmsg">Open your secret desk link (the one ending in #t=…) once on this device.</p></div>
 <main id="app">
@@ -325,7 +342,10 @@ function chartBtn(u) {
   return (typeof u === "string" && /^https:\/\/dexscreener\.com\/[A-Za-z0-9\/]+$/.test(u))
     ? `<a class="btn ghost" href="${esc(u)}" target="_blank" rel="noopener noreferrer">Open chart</a>` : "";
 }
-// Live DexScreener embed: Dark/Dim -> dark chart, Light -> light. Only the visible card mounts an iframe.
+// Live DexScreener embed (custom Lightweight Charts / drawn thresholds = later; lch.js present but unused).
+const MC_LEVELS = [3000000, 2000000, 1000000, 700000, 500000, 250000, 200000, 100000];
+const ALERTS_SEEN_KEY = "desk_alerts_seen_ts";
+const USE_LCH = false; // later: threshold lines drawn inside a custom MC chart
 function chartTheme() { return document.documentElement.dataset.theme === "light" ? "light" : "dark"; }
 function embedAddr(chartUrl, mint) {
   if (typeof chartUrl === "string") {
@@ -335,12 +355,75 @@ function embedAddr(chartUrl, mint) {
   if (typeof mint === "string" && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(mint)) return mint;
   return null;
 }
+function fmtMc(n) {
+  n = +n; if (!Number.isFinite(n)) return "–";
+  if (n >= 1e6) { const v = n / 1e6; return "$" + (Math.abs(v - Math.round(v)) < 1e-9 ? Math.round(v) : v.toFixed(1).replace(/\.0$/, "")) + "M"; }
+  return "$" + Math.round(n / 1e3) + "K";
+}
+function tmAms(ts) {
+  if (!ts) return "–";
+  try { return new Date(ts * 1000).toLocaleString("en-GB", { timeZone: "Europe/Amsterdam", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }); }
+  catch (e) { return tm(ts); }
+}
+function feedAlerts() {
+  const fromDesk = (D && D.alerts) || [];
+  const fromAg = (D && D.agentsx && D.agentsx.alerts) || [];
+  // Prefer desk feed; fall back to agents. Dedup by id/ts+kind+mint.
+  const src = fromDesk.length ? fromDesk : fromAg;
+  const seen = new Set(); const out = [];
+  for (const a of src) {
+    const k = a.id != null ? "id:" + a.id : [a.ts, a.kind, a.mint, a.title].join("|");
+    if (seen.has(k)) continue; seen.add(k); out.push(a);
+  }
+  return out.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+}
+function mcWatchFor(mint) {
+  const w = (D && (D.mc_watch || (D.agentsx && D.agentsx.mc_watch))) || {};
+  return w[mint] || null;
+}
+function levelsNear(mc, firedMap) {
+  // Levels "in range": seen/fired, or within ~3× of current MC (so tiny coins aren't crushed by $3M).
+  const fired = firedMap || {};
+  const cur = +mc || 0;
+  return MC_LEVELS.filter(lv => {
+    if (fired[lv] != null || fired[String(lv)] != null) return true;
+    if (!cur) return lv <= 1_000_000; // default band when MC unknown
+    return lv <= cur * 3 && lv >= cur / 8;
+  });
+}
+function mcLevelStrip(mint) {
+  const st = mcWatchFor(mint) || {};
+  const live = (typeof LIVE !== "undefined" && LIVE[mint]) || {};
+  const mc = st.last_mc != null ? st.last_mc : live.mcap;
+  const fired = st.fired || {};
+  const levels = levelsNear(mc, fired);
+  if (!levels.length) return `<div class="mc-strip mut sm">No MC ladder levels in range${mc ? " · now " + fmtMc(mc) : ""}.</div>`;
+  const chips = levels.map(lv => {
+    const on = fired[lv] != null || fired[String(lv)] != null;
+    return `<span class="mc-lv${on ? " fired" : ""}" title="${on ? "Fired" : "Watch"} ${fmtMc(lv)}">${fmtMc(lv)}${on ? " ✓" : ""}</span>`;
+  }).join("");
+  return `<div class="mc-strip"><span class="mut sm">MC ladder${mc ? " · now " + fmtMc(mc) : ""}</span><div class="mc-lvs">${chips}</div></div>`;
+}
+function coinAlertsHtml(mint, n) {
+  n = n || 5;
+  if (!mint) return "";
+  const rows = feedAlerts().filter(a => a.mint === mint).slice(0, n);
+  if (!rows.length) return `<div class="mc-alerts"><span class="chip mut">No alerts for this coin yet</span></div>`;
+  return `<div class="mc-alerts">${rows.map(a => {
+    const label = a.short || a.title || a.kind;
+    const when = tmAms(a.ts).split(",").pop().trim(); // HH:MM Amsterdam
+    const fire = a.level || /rug|RUGGED|danger/i.test(a.title || "") || a.kind === "danger_on";
+    return `<span class="chip${fire ? " fire" : ""}">${esc(label)} · ${esc(when)}</span>`;
+  }).join("")}</div>`;
+}
 function liveChartHtml(chartUrl, mint) {
+  // DexScreener embed on top; thresholds + recent alerts under it (drawn-on-chart lines = later).
   const addr = embedAddr(chartUrl, mint);
-  if (!addr) return `<div class="chart-miss mut sm">chart unavailable</div>`;
   const th = chartTheme();
-  const src = `https://dexscreener.com/solana/${addr}?embed=1&theme=${th}&chartTheme=${th}&info=0&trades=0&chartLeftToolbar=0&interval=5`;
-  return `<div class="live-chart"><iframe src="${esc(src)}" title="Live price chart" loading="lazy" referrerpolicy="no-referrer" allow="clipboard-write"></iframe></div>`;
+  const chart = addr
+    ? `<div class="live-chart"><iframe src="${esc(`https://dexscreener.com/solana/${addr}?embed=1&theme=${th}&chartTheme=${th}&info=0&trades=0&chartLeftToolbar=0&interval=5`)}" title="Live price chart" loading="lazy" referrerpolicy="no-referrer" allow="clipboard-write"></iframe></div>`
+    : `<div class="chart-miss mut sm">chart unavailable</div>`;
+  return `<div class="mc-chart-wrap" data-mint="${esc(mint || "")}">${chart}${mint ? mcLevelStrip(mint) : ""}${mint ? coinAlertsHtml(mint, 5) : ""}</div>`;
 }
 // Holder / wallet-owner links (plain, no referral). Same base58 shape as a Solana mint/wallet.
 function holdersBtns(mint, compact) {
@@ -377,18 +460,20 @@ function renderHeader() {
   $("upd").innerHTML = `<span class="${old ? "red" : ""}">Upd ${agoShort(D.ts)}</span>`;
   const m = currentMint(), box = $("hdrCoin"), w = $("hdrWallets"), b = $("hdrBubble");
   const ok = typeof m === "string" && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(m);
-  if (!box || !w || !b) return;
-  if (ok) {
-    box.hidden = false;
-    w.href = "https://solscan.io/token/" + m + "#holders";
-    b.href = "https://app.bubblemaps.io/sol/token/" + m;
-    w.setAttribute("aria-disabled", "false"); b.setAttribute("aria-disabled", "false");
-    w.title = "Solscan holders for this coin"; b.title = "Bubblemaps for this coin";
-  } else {
-    box.hidden = true;
-    w.removeAttribute("href"); b.removeAttribute("href");
-    w.setAttribute("aria-disabled", "true"); b.setAttribute("aria-disabled", "true");
+  if (box && w && b) {
+    if (ok) {
+      box.hidden = false;
+      w.href = "https://solscan.io/token/" + m + "#holders";
+      b.href = "https://app.bubblemaps.io/sol/token/" + m;
+      w.setAttribute("aria-disabled", "false"); b.setAttribute("aria-disabled", "false");
+      w.title = "Solscan holders for this coin"; b.title = "Bubblemaps for this coin";
+    } else {
+      box.hidden = true;
+      w.removeAttribute("href"); b.removeAttribute("href");
+      w.setAttribute("aria-disabled", "true"); b.setAttribute("aria-disabled", "true");
+    }
   }
+  updateBellBadge();
 }
 
 function morningHtml() {
@@ -588,8 +673,44 @@ function renderTrades() { $("v-trades").innerHTML = tradesHtml(false); }
 
 const evLi = e => `<li><div class="row"><span class="stage">${esc(e.kind)}</span><b class="sm">${esc(e.title)}</b><span class="sp"></span><span class="sm mut">${tm(e.ts)}</span></div>
   ${e.sub ? `<div class="sm mut">${esc(e.sub)}</div>` : ""}</li>`;
+function alertsSeenTs() { return +(localStorage.getItem(ALERTS_SEEN_KEY) || 0); }
+function setAlertsSeenNow() {
+  const mx = feedAlerts().reduce((m, a) => Math.max(m, a.ts || 0), alertsSeenTs());
+  localStorage.setItem(ALERTS_SEEN_KEY, String(mx));
+  updateBellBadge();
+}
+function updateBellBadge() {
+  const dot = $("hdrBellDot"); if (!dot) return;
+  const seen = alertsSeenTs();
+  const n = feedAlerts().filter(a => (a.ts || 0) > seen).length;
+  if (n > 0) { dot.hidden = false; dot.textContent = n > 99 ? "99+" : String(n); }
+  else dot.hidden = true;
+}
+function alertFeedHtml() {
+  const seen = alertsSeenTs();
+  const rows = feedAlerts();
+  if (!rows.length) return `<p class="mut sm">No alerts yet. Watchlist MC ladder, buys, follows and rug warnings land here (same data as Telegram).</p>`;
+  return rows.map(a => {
+    const unread = (a.ts || 0) > seen;
+    const chart = a.chart_url || (a.mint ? ("https://dexscreener.com/solana/" + a.mint) : null);
+    const lvl = a.level && MC_LEVELS.includes(a.level) ? `<span class="stage st-watch">${fmtMc(a.level)}</span>` : (a.tier ? `<span class="stage st-watch">${esc(a.tier)}</span>` : "");
+    const mcLine = a.mc ? ` · MC ${fmtMc(a.mc)}` : "";
+    return `<div class="alert-item${unread ? " unread" : ""}">
+      <div class="row"><span class="stage">${esc((a.kind || "").replace(/_/g, " "))}</span>${lvl}
+        <b class="sm">${esc(a.sym || a.title || "?")}</b><span class="sp"></span><span class="sm mut">${tmAms(a.ts)}</span></div>
+      <div class="sm mut">${esc(a.short || a.title || "")}${esc(mcLine)}</div>
+      ${a.body && a.body !== a.short ? `<div class="sm mut" style="white-space:pre-line;margin-top:.15rem">${esc((a.body || "").split("\n").slice(0, 3).join(" · ").slice(0, 180))}</div>` : ""}
+      <div class="row" style="margin-top:.35rem;gap:.35rem;flex-wrap:wrap">${chartBtn(chart)}${holdersBtns(a.mint, true)}${a.url && a.kind !== "auto_paper" && a.kind !== "bedtime" ? fomoBtn(a.url, true) : ""}</div>
+    </div>`;
+  }).join("");
+}
 function renderEvents() {
-  $("v-events").innerHTML = `<div class="card"><b>Recent events</b><ul class="plain" style="margin-top:.4rem">${D.events.map(evLi).join("") || `<li class="mut">Nothing yet.</li>`}</ul></div>`;
+  // Alerts tab (bell): real push_queue rows. Activity log stays below for desk ops.
+  setAlertsSeenNow();
+  $("v-events").innerHTML = `<div class="card"><div class="row"><b>🔔 Alerts</b><span class="sp"></span><span class="sm mut">Amsterdam time · newest first</span></div>
+    <p class="sm mut">Watchlist MC ladder ($3M→$100K), buys, follows and rug/danger warnings — same rows Telegram gets.</p>
+    ${alertFeedHtml()}</div>
+    <div class="card"><b>Desk activity</b><ul class="plain" style="margin-top:.4rem">${(D.events || []).slice(0, 20).map(evLi).join("") || `<li class="mut">Nothing yet.</li>`}</ul></div>`;
 }
 
 // Whales: followed top traders (follow.py). Read-only, PAPER - the desk never copies or trades.
@@ -1122,6 +1243,7 @@ function show(v) {
   window.scrollTo(0, 0);
 }
 document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => show(b.dataset.v));
+const _bell = $("hdrBell"); if (_bell) _bell.onclick = () => show("events");
 document.addEventListener("click", e => { const g = e.target.closest("[data-go]"); if (g) show(g.dataset.go); });
 
 // swipe between coins on the Auditor screen
