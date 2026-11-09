@@ -359,8 +359,17 @@ function fomoBtn(link, ghost, label) {
   const text = label || "Open on FOMO";
   return u ? `<a class="btn${ghost ? " ghost" : ""}" href="${esc(u)}" target="_blank" rel="noopener noreferrer">${text}</a>` : "";
 }
-function buyFomoBtn(link, ghost) { return fomoBtn(link, !!ghost, "Buy on FOMO"); }
-function sellFomoBtn(link, ghost) { return fomoBtn(link, !!ghost, "Sell on FOMO"); }
+function plainFomoUrl(link) {
+  // drop any referral query if a stale feed row still carries one (desk never adds r=)
+  const u = safeUrl(link); if (!u) return "";
+  try {
+    const x = new URL(u);
+    if (x.searchParams.has("r")) x.searchParams.delete("r");
+    return x.toString();
+  } catch (e) { return u; }
+}
+function buyFomoBtn(link, ghost) { return fomoBtn(plainFomoUrl(link), !!ghost, "Buy on FOMO"); }
+function sellFomoBtn(link, ghost) { return fomoBtn(plainFomoUrl(link), !!ghost, "Sell on FOMO"); }
 /** Prominent Buy / Sell shortcut on alerts (not MC-ladder alone for Buy; Sell covers ladder + TP/SL + rug-ish watch). */
 function alertFomoBtn(a, ghost) {
   if (!a || !a.url || a.kind === "auto_paper" || a.kind === "bedtime" || a.kind === "desk_locked" || a.kind === "desk_paused" || a.kind === "danger_on" || a.kind === "danger_off") return "";
