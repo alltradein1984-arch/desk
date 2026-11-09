@@ -7,7 +7,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' https: data:; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' https://api.dexscreener.com https://api.rugcheck.xyz https://api.geckoterminal.com; frame-src https://dexscreener.com https://www.dexscreener.com; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="theme-color" content="#07090c">
 <title>Desk</title>
-<!-- desk-build:19 chart-hold -->
+<!-- desk-build:20 my-wallets -->
 <script>
 // set the theme before first paint; Dark / Dim / Light (legacy auto/light migrated once)
 (function () { try {
@@ -82,6 +82,10 @@ html[data-theme="light"] .mc-lv.fired,html[data-theme="dim"] .mc-lv.fired{backgr
 .mc-alerts .chip{font-size:.68rem;font-weight:600;padding:.15rem .45rem;border-radius:99px;background:var(--card);border:1px solid var(--line);color:var(--mut)}
 .mc-alerts .chip.fire{color:var(--red);border-color:var(--red);background:transparent}
 .hdr-bell{position:relative;background:var(--card2);color:var(--txt);border:1px solid var(--line);border-radius:99px;font-size:.72rem;padding:.18rem .55rem;cursor:pointer;flex:none}
+.hdr-wallet{background:var(--card2);color:var(--txt);border:1px solid var(--line);border-radius:99px;font-size:.72rem;padding:.18rem .55rem;cursor:pointer;flex:none;white-space:nowrap;max-width:9.5rem;overflow:hidden;text-overflow:ellipsis}
+.b-real{background:#1a2a18;color:var(--grn);border:1px solid #2d5a35}
+html[data-theme="dim"] .b-real,html[data-theme="light"] .b-real{background:#e2f6ea;border-color:#a9e2c2;color:#0b6b3b}
+.real-item{border-left:3px solid var(--grn);padding-left:.55rem}
 .hdr-bell .dot{position:absolute;top:-3px;right:-3px;min-width:16px;height:16px;padding:0 4px;border-radius:99px;background:var(--red);color:#fff;font-size:.62rem;font-weight:800;display:flex;align-items:center;justify-content:center;line-height:1}
 .hdr-bell .dot[hidden]{display:none!important}
 .alert-item{padding:.65rem 0;border-bottom:1px solid var(--line)}.alert-item:last-child{border:0}
@@ -243,6 +247,7 @@ html[data-theme="light"] #v-agents,html[data-theme="light"] #v-race,html[data-th
 <header>
   <h1>DESK</h1><span id="mode" class="badge b-paper">…</span>
   <button type="button" class="hdr-bell" id="hdrBell" title="Alerts">🔔<span class="dot" id="hdrBellDot" hidden>0</span></button>
+  <button type="button" class="hdr-wallet" id="hdrWallet" title="My REAL wallets (read-only)">REAL</button>
   <span id="hdrCoin" class="hdr-coin" hidden>
     <a class="hdr-btn" id="hdrWallets" target="_blank" rel="noopener noreferrer">Wallets</a>
     <a class="hdr-btn" id="hdrBubble" target="_blank" rel="noopener noreferrer">Bubble</a>
@@ -1019,6 +1024,58 @@ function renderCoins() {
     aIdx = auditList().findIndex(a => a.mint === b.dataset.audit); show("audit"); });
 }
 
+function myWalletAccounts() { return (D && D.mywallets && D.mywallets.accounts) || []; }
+function myWalletHoldings(label) {
+  const all = (D && D.mywallets && D.mywallets.holdings) || [];
+  return label ? all.filter(h => h.label === label) : all;
+}
+function realWalletHtml(compact) {
+  const acc = myWalletAccounts();
+  const MW = D && D.mywallets;
+  if (!MW) return `<div class="card" id="realWalletCard"><div class="row"><b>My wallet (REAL)</b><span class="sp"></span><span class="badge b-real">REAL · read-only</span></div>
+    <p class="sm mut">Wallet watcher not in this feed yet.</p></div>`;
+  const cur = acc[walletIdx % Math.max(acc.length, 1)] || null;
+  const holdings = cur ? myWalletHoldings(cur.label) : [];
+  const status = !cur ? "No wallets configured" : (cur.configured ? `${holdings.length} held` : "address not added yet");
+  const rows = holdings.map(h => {
+    const pnl = h.entry != null && h.pnl != null ? `<b class="${cls(h.pnl)}">${usd(h.pnl,1)} <span class="sm">${pct(h.pnl_pct)}</span></b>` : `<span class="sm mut">entry unknown</span>`;
+    return `<div class="item real-item"><div class="row"><b>${esc(h.sym || shortMint(h.mint))}</b>
+      <span class="stage">${esc(h.label)}</span><span class="badge b-real">REAL</span><span class="sp"></span>${pnl}</div>
+      <div class="sm mut">${(h.amount!=null?h.amount.toLocaleString(undefined,{maximumFractionDigits:4}):"?")} tokens · ${h.usd!=null?"~"+usd(h.usd):"n/a"} · now ${h.price!=null?px(h.price):"n/a"}${h.entry!=null?" · entry "+px(h.entry):""}</div>
+      <div class="row" style="margin-top:.35rem;gap:.35rem;flex-wrap:wrap">${sellFomoBtn(h.link)}${chartBtn(h.chart_url)}${holdersBtns(h.mint,true)}</div></div>`;
+  }).join("");
+  const empty = cur && !cur.configured
+    ? `<p class="sm mut">${esc(cur.label)}: address not added yet. Send Mike the deposit address to enable polling.</p>`
+    : `<p class="sm mut">No meme coins above $${(MW.min_usd||1)} held right now (stables/dust skipped). Read-only — desk never signs or sells.</p>`;
+  return `<div class="card" id="realWalletCard"><div class="row"><b>My wallet (REAL)</b><span class="sp"></span>
+      <span class="badge b-real">REAL · read-only</span></div>
+    <div class="row" style="margin-top:.35rem;gap:.4rem;flex-wrap:wrap"><b class="sm">${esc(cur ? cur.label : "—")}</b>
+      <span class="sm mut">${esc(status)}</span><span class="sp"></span>
+      <button type="button" class="btn ghost" id="realCycleBtn" style="font-size:.72rem;padding:.25rem .55rem">Cycle wallet</button></div>
+    <p class="sm mut" style="margin-top:.25rem">Public balances only. Never connects a wallet. Desk trades stay PAPER.</p>
+    ${rows || empty}</div>`;
+}
+let walletIdx = +(localStorage.getItem("desk_wallet_idx") || 0);
+function cycleWallet() {
+  const acc = myWalletAccounts();
+  if (!acc.length) return;
+  walletIdx = (walletIdx + 1) % acc.length;
+  localStorage.setItem("desk_wallet_idx", String(walletIdx));
+  updateWalletBtn();
+  if (view === "trades") renderTrades();
+  else show("trades");
+  const el = $("realWalletCard"); if (el) el.scrollIntoView({block:"start", behavior:"smooth"});
+}
+function updateWalletBtn() {
+  const b = $("hdrWallet"); if (!b) return;
+  const acc = myWalletAccounts();
+  if (!acc.length) { b.textContent = "REAL"; b.title = "My REAL wallets"; return; }
+  walletIdx = walletIdx % acc.length;
+  const cur = acc[walletIdx];
+  const n = cur.configured ? (cur.count || myWalletHoldings(cur.label).length) : 0;
+  b.textContent = cur.configured ? `${cur.label} · ${n}` : `${cur.label} · —`;
+  b.title = cur.configured ? `${cur.label}: ${n} held (tap to cycle / open)` : `${cur.label}: address not added yet (tap to cycle)`;
+}
 function tradesHtml(compact) {
   const O = D.open, T = D.trades;
   const open = O.map(p => `<div class="item"><div class="row">${logo(p, "lg")}<div style="flex:1"><div class="row"><b>${esc(p.sym || shortMint(p.mint))}</b>
@@ -1032,12 +1089,17 @@ function tradesHtml(compact) {
       <div class="sm mut">${usd(t.size)} · ${px(t.entry)} → ${px(t.exit)} · ${esc(t.reason || "")}</div>
       <div class="row" style="margin-top:.4rem;gap:.35rem;flex-wrap:wrap"><span class="sp"></span>${chartBtn(t.chart_url)}${fomoBtn(t.link, true)}${holdersBtns(t.mint, true)}</div></div>`).join("");
   const total = T.reduce((s, t) => s + (t.pnl || 0), 0);
-  return `<div class="card"><div class="row"><b>Open positions${compact ? " (live)" : ""}</b><span class="sp"></span><span class="sm mut">${O.length}</span></div>
-      ${open || `<p class="mut sm">No open positions.</p>`}</div>
-    <div class="card"><div class="row"><b>Closed trades</b><span class="sp"></span><span class="sm ${cls(total)}">${T.length ? usd(total, 1) + " total" : ""}</span></div>
-      ${closed || `<p class="mut sm">No closed trades yet.</p>`}</div>`;
+  return `${compact ? "" : realWalletHtml(false)}
+    <div class="card"><div class="row"><b>Open positions${compact ? " (live)" : ""} · PAPER</b><span class="sp"></span><span class="sm mut">${O.length}</span></div>
+      ${open || `<p class="mut sm">No open PAPER positions.</p>`}</div>
+    <div class="card"><div class="row"><b>Closed trades · PAPER</b><span class="sp"></span><span class="sm ${cls(total)}">${T.length ? usd(total, 1) + " total" : ""}</span></div>
+      ${closed || `<p class="mut sm">No closed PAPER trades yet.</p>`}</div>`;
 }
-function renderTrades() { $("v-trades").innerHTML = tradesHtml(false); }
+function renderTrades() {
+  $("v-trades").innerHTML = tradesHtml(false);
+  const c = $("realCycleBtn"); if (c) c.onclick = (e) => { e.preventDefault(); cycleWallet(); };
+  updateWalletBtn();
+}
 
 const evLi = e => `<li><div class="row"><span class="stage">${esc(e.kind)}</span><b class="sm">${esc(e.title)}</b><span class="sp"></span><span class="sm mut">${tm(e.ts)}</span></div>
   ${e.sub ? `<div class="sm mut">${esc(e.sub)}</div>` : ""}</li>`;
@@ -1634,6 +1696,7 @@ function show(v) {
 }
 document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => show(b.dataset.v));
 const _bell = $("hdrBell"); if (_bell) _bell.onclick = () => show("events");
+const _wbtn = $("hdrWallet"); if (_wbtn) _wbtn.onclick = () => cycleWallet();
 document.addEventListener("click", e => { const g = e.target.closest("[data-go]"); if (g) show(g.dataset.go); });
 
 // swipe between coins on the Auditor screen (never when gesture starts on the chart)
@@ -1660,7 +1723,7 @@ let swReg = null, pushCode = localStorage.getItem("desk_push_code");
 async function registerSW() {
   if (!("serviceWorker" in navigator)) return null;
   try {
-    swReg = await navigator.serviceWorker.register("sw.js?v=19", { scope: "./" });
+    swReg = await navigator.serviceWorker.register("sw.js?v=20", { scope: "./" });
     if (swReg && swReg.update) swReg.update().catch(() => {});
     // New SW takes control → reload once so the PWA drops a blank half-cached shell.
     let refreshing = false;
