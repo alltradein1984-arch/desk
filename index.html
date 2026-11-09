@@ -43,6 +43,20 @@ header .upd{margin-left:auto;color:var(--mut);font-size:.68rem;text-align:right;
 .chart-miss{padding:.7rem .8rem;text-align:center;border:1px dashed var(--line);border-radius:12px;margin:0 0 .75rem}
 .mc-chart-wrap{margin:0 0 .75rem;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--card2)}
 .mc-chart{width:100%;height:320px}
+.dex-info{margin:.55rem 0 .35rem;padding:.55rem .6rem;border:1px solid var(--line);border-radius:12px;background:var(--card2)}
+.dex-info .di-pair{font-weight:800;font-size:1rem}
+.dex-info .di-meta{font-size:.78rem;color:var(--mut);margin:.15rem 0 .35rem}
+.dex-info .di-links{display:flex;flex-wrap:wrap;gap:.35rem;margin:.2rem 0 .45rem}
+.dex-info .di-links a{font-size:.72rem;font-weight:700;padding:.15rem .5rem;border-radius:99px;border:1px solid var(--line);color:var(--txt);text-decoration:none;background:var(--card)}
+.dex-info .di-tabs{display:flex;gap:.3rem;margin:.35rem 0 .45rem}
+.dex-info .di-tab{flex:1;text-align:center;font-size:.72rem;font-weight:800;padding:.35rem .2rem;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--mut);cursor:pointer}
+.dex-info .di-tab.on{background:var(--card);color:var(--txt);border-color:var(--txt)}
+.dex-info .di-tab .chg{display:block;font-size:.78rem;margin-top:.1rem}
+.dex-info .di-grid{display:grid;grid-template-columns:1fr 1fr;gap:.35rem .6rem;font-size:.8rem}
+.dex-info .di-grid b{display:block;font-size:.95rem}
+.dex-info .di-bar{height:6px;border-radius:99px;background:rgba(127,127,127,.2);overflow:hidden;display:flex;margin-top:.25rem}
+.dex-info .di-bar i{display:block;height:100%}
+.dex-info .di-bar i.b{background:var(--grn)}.dex-info .di-bar i.s{background:var(--red)}
 .mc-strip{padding:.45rem .55rem;border-top:1px solid var(--line)}
 .mc-lvs{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.3rem}
 .mc-lv{font-size:.68rem;font-weight:700;padding:.14rem .45rem;border-radius:99px;border:1px dashed var(--line);color:var(--mut);background:transparent}
@@ -417,13 +431,136 @@ function coinAlertsHtml(mint, n) {
   }).join("")}</div>`;
 }
 function liveChartHtml(chartUrl, mint) {
-  // DexScreener embed on top; thresholds + recent alerts under it (drawn-on-chart lines = later).
+  // DexScreener embed only. Order on card: chart → name header → dex info → MC/alerts → checks.
   const addr = embedAddr(chartUrl, mint);
   const th = chartTheme();
   const chart = addr
     ? `<div class="live-chart"><iframe src="${esc(`https://dexscreener.com/solana/${addr}?embed=1&theme=${th}&chartTheme=${th}&info=0&trades=0&chartLeftToolbar=0&interval=5`)}" title="Live price chart" loading="lazy" referrerpolicy="no-referrer" allow="clipboard-write"></iframe></div>`
     : `<div class="chart-miss mut sm">chart unavailable</div>`;
-  return `<div class="mc-chart-wrap" data-mint="${esc(mint || "")}">${chart}${mint ? mcLevelStrip(mint) : ""}${mint ? coinAlertsHtml(mint, 5) : ""}</div>`;
+  return `<div class="mc-chart-wrap" data-mint="${esc(mint || "")}">${chart}</div>`;
+}
+function coinChartMeta(mint) {
+  if (!mint) return "";
+  return `${mcLevelStrip(mint)}${coinAlertsHtml(mint, 5)}`;
+}
+const DEX_TF = [["m5","5M"],["h1","1H"],["h6","6H"],["h24","24H"]];
+const DEX_NAME = { pumpswap: "PumpSwap", raydium: "Raydium", orca: "Orca", meteora: "Meteora", moonshot: "Moonshot", pumpfun: "Pump.fun", "pump.fun": "Pump.fun" };
+function dexAge(ms) {
+  if (!ms) return "n/a";
+  const m = Math.max(0, (Date.now() - ms) / 60000);
+  if (m < 60) return Math.round(m) + "m";
+  if (m < 48 * 60) return (m / 60).toFixed(1).replace(/\.0$/, "") + "h";
+  return Math.round(m / 1440) + "d";
+}
+function dexMoney(n) {
+  if (n == null || !Number.isFinite(+n)) return "n/a";
+  n = +n;
+  const a = Math.abs(n);
+  if (a >= 1e6) return "$" + (n / 1e6).toFixed(2).replace(/\.00$/, "") + "M";
+  if (a >= 1e3) return "$" + (n / 1e3).toFixed(1).replace(/\.0$/, "") + "K";
+  if (a >= 1) return "$" + n.toFixed(2);
+  if (a >= 0.0001) return "$" + n.toPrecision(4);
+  return "$" + n.toExponential(2);
+}
+function dexPx(n) {
+  if (n == null || n === "" || !Number.isFinite(+n)) return "n/a";
+  n = +n;
+  if (Math.abs(n) >= 1) return n.toFixed(4);
+  return n.toPrecision(4);
+}
+function dexInfoPlaceholder(mint) {
+  return `<div class="dex-info" data-dexinfo="${esc(mint || "")}"><div class="sm mut">Loading DexScreener…</div></div>`;
+}
+function renderDexInfoInto(el, pair, tf) {
+  if (!el) return;
+  if (!pair) { el.innerHTML = `<div class="sm mut">chart unavailable · DexScreener pair n/a</div>`; return; }
+  tf = tf || el.dataset.tf || "h1";
+  el.dataset.tf = tf;
+  const base = (pair.baseToken || {}).symbol || "?";
+  const quote = (pair.quoteToken || {}).symbol || "?";
+  const dexId = pair.dexId || "";
+  const dexLabel = DEX_NAME[dexId] || dexId || "n/a";
+  const mint = (pair.baseToken || {}).address || "";
+  const viaPump = /pump$/i.test(mint) || /pump/i.test(dexId) ? " via Pump.fun" : "";
+  const info = pair.info || {};
+  const sites = (info.websites || []).filter(w => w && w.url && /^https:\/\//.test(w.url));
+  const socials = (info.socials || []).filter(s => s && s.url && /^https:\/\//.test(s.url));
+  const links = [];
+  for (const w of sites) links.push(`<a href="${esc(w.url)}" target="_blank" rel="noopener noreferrer">${esc(w.label || "Website")}</a>`);
+  for (const s of socials) links.push(`<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.type === "twitter" ? "Twitter" : (s.type || "Social"))}</a>`);
+  const pc = (pair.priceChange || {})[tf];
+  const tx = (pair.txns || {})[tf] || {};
+  const buys = Number.isFinite(+tx.buys) ? +tx.buys : null;
+  const sells = Number.isFinite(+tx.sells) ? +tx.sells : null;
+  const vol = (pair.volume || {})[tf];
+  // Dex API volume is a single total per TF — no buy/sell volume split, makers, or unique buyers/sellers.
+  const buyVol = null, sellVol = null, makers = null, buyers = null, sellers = null;
+  const txns = (buys != null && sells != null) ? (buys + sells) : (buys != null ? buys : sells);
+  const chgCls = pc == null ? "" : pc > 0 ? "grn" : pc < 0 ? "red" : "";
+  const tabs = DEX_TF.map(([k, lab]) => {
+    const c = (pair.priceChange || {})[k];
+    const cc = c == null ? "mut" : c > 0 ? "grn" : c < 0 ? "red" : "mut";
+    return `<button type="button" class="di-tab${k === tf ? " on" : ""}" data-tf="${k}">${lab}<span class="chg ${cc}">${c == null ? "n/a" : ((c > 0 ? "+" : "") + (+c).toFixed(2) + "%")}</span></button>`;
+  }).join("");
+  const buyPct = (buys != null && sells != null && (buys + sells) > 0) ? (buys / (buys + sells) * 100) : null;
+  const liq = (pair.liquidity || {}).usd;
+  // Lock icon only if DexScreener API exposes a lock flag (it does not on the public pair payload → never invent one).
+  const locked = !!(pair.liquidity && (pair.liquidity.locked === true || pair.liquidity.isLocked === true));
+  el.innerHTML = `
+    <div class="di-pair">${esc(base)} / ${esc(quote)}</div>
+    <div class="di-meta">${esc(dexLabel)}${esc(viaPump)} · age ${esc(dexAge(pair.pairCreatedAt))}</div>
+    ${links.length ? `<div class="di-links">${links.join("")}</div>` : `<div class="di-meta">Website / Twitter: n/a</div>`}
+    <div class="di-grid">
+      <div><span class="mut sm">Price USD</span><b>${dexMoney(+pair.priceUsd)}</b></div>
+      <div><span class="mut sm">Price ${esc(quote)}</span><b>${dexPx(pair.priceNative)}</b></div>
+      <div><span class="mut sm">Liquidity${locked ? " 🔒" : ""}</span><b>${dexMoney(liq)}</b></div>
+      <div><span class="mut sm">FDV</span><b>${dexMoney(pair.fdv)}</b></div>
+      <div><span class="mut sm">Market cap</span><b>${dexMoney(pair.marketCap)}</b></div>
+      <div><span class="mut sm">Change (${esc((DEX_TF.find(x => x[0] === tf) || [])[1] || tf)})</span><b class="${chgCls}">${pc == null ? "n/a" : ((pc > 0 ? "+" : "") + (+pc).toFixed(2) + "%")}</b></div>
+    </div>
+    <div class="di-tabs">${tabs}</div>
+    <div class="di-grid">
+      <div><span class="mut sm">TXNS</span><b>${txns == null ? "n/a" : txns.toLocaleString()}</b>
+        <div class="sm mut">Buys ${buys == null ? "n/a" : buys.toLocaleString()} / Sells ${sells == null ? "n/a" : sells.toLocaleString()}</div>
+        ${buyPct != null ? `<div class="di-bar"><i class="b" style="width:${buyPct}%"></i><i class="s" style="width:${100 - buyPct}%"></i></div>` : ""}</div>
+      <div><span class="mut sm">Volume</span><b>${dexMoney(vol)}</b>
+        <div class="sm mut">Buy vol ${buyVol == null ? "n/a" : dexMoney(buyVol)} / Sell vol ${sellVol == null ? "n/a" : dexMoney(sellVol)}</div></div>
+      <div><span class="mut sm">Makers / Traders</span><b>${makers == null ? "n/a" : makers.toLocaleString()}</b>
+        <div class="sm mut">Buyers ${buyers == null ? "n/a" : buyers.toLocaleString()} / Sellers ${sellers == null ? "n/a" : sellers.toLocaleString()}</div></div>
+    </div>
+    <div class="sm mut" style="margin-top:.35rem">Source: DexScreener public API · missing fields show n/a (not estimated)</div>`;
+  el.querySelectorAll(".di-tab").forEach(btn => btn.onclick = () => renderDexInfoInto(el, pair, btn.dataset.tf));
+}
+async function fetchDexPair(mint) {
+  if (!mint || !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(mint)) return null;
+  try {
+    const r = await fetch(`https://api.dexscreener.com/tokens/v1/solana/${mint}`, { cache: "no-store", referrerPolicy: "no-referrer" });
+    const pairs = await r.json();
+    if (!Array.isArray(pairs) || !pairs.length) return null;
+    return pairs.reduce((a, p) => ((p.liquidity || {}).usd || 0) > ((a.liquidity || {}).usd || 0) ? p : a);
+  } catch (e) { return null; }
+}
+async function refreshDexInfo(mint) {
+  if (!mint) return;
+  const el = document.querySelector(`[data-dexinfo="${CSS.escape(mint)}"]`);
+  if (!el) return;
+  // Reuse LIVE pair quote when fresh; always prefer full Dex pair payload for txns/volume/info.
+  const pair = await fetchDexPair(mint);
+  if (pair && typeof LIVE !== "undefined") {
+    LIVE[mint] = Object.assign(LIVE[mint] || {}, {
+      price: pair.priceUsd != null ? +pair.priceUsd : (LIVE[mint] || {}).price,
+      mcap: pair.marketCap != null ? +pair.marketCap : (LIVE[mint] || {}).mcap,
+      liq: (pair.liquidity || {}).usd != null ? +pair.liquidity.usd : (LIVE[mint] || {}).liq,
+      pair: pair.pairAddress || (LIVE[mint] || {}).pair,
+      sym: (pair.baseToken || {}).symbol || (LIVE[mint] || {}).sym,
+      dexPair: pair, ts: Date.now() / 1000
+    });
+  }
+  renderDexInfoInto(el, pair, el.dataset.tf || "h1");
+}
+function scheduleDexInfoRefresh() {
+  const mint = currentMint();
+  if (view === "audit" || view === "coin") refreshDexInfo(mint);
 }
 // Holder / wallet-owner links (plain, no referral). Same base58 shape as a Solana mint/wallet.
 function holdersBtns(mint, compact) {
@@ -573,6 +710,8 @@ function renderAudit() {
       <div class="coin">${logo(a)}<div><div style="font-weight:800;font-size:1.15rem">${esc(a.sym || "?")}</div>
         <div class="sm mut">${esc(a.name || "")}</div><div class="sm mut">${esc(shortMint(a.mint))} · Solana · ${ago(a.ts)}</div></div>
         <span class="pill ${ok ? "p-ok" : "p-bad"}">${ok ? "Cleared" : "Rejected"}</span></div>
+      ${dexInfoPlaceholder(a.mint)}
+      ${coinChartMeta(a.mint)}
       <div class="checks">${a.rows.map((r, i) => {
         const st = r.ok === true ? "ok" : r.ok === false ? "bad" : "na";
         return `<div class="chk ${st}" style="animation-delay:${i * 45}ms"><div class="ic ic-${st}">${st === "ok" ? "✓" : st === "bad" ? "!" : "–"}</div>
@@ -589,6 +728,7 @@ function renderAudit() {
   document.querySelectorAll(".dots i").forEach(d => d.onclick = () => { aIdx = +d.dataset.i; renderAudit(); });
   renderSplitTrades();
   renderHeader();
+  refreshDexInfo(a.mint);
 }
 function renderSplitTrades() { $("splitTrades").innerHTML = tradesHtml(true); }
 
@@ -1070,6 +1210,8 @@ function renderCoin() {
     ${liveChartHtml(chartUrl, m)}
     <h2 style="margin:.4rem 0 .1rem">${esc(c.sym || L.sym || (R && R.sym) || shortMint(m))}</h2>${isPasted ? `<span class="stage">pasted · not tracked by the desk</span>` : ""}<div class="sm mut" style="word-break:break-all"><code>${esc(m)}</code></div>
     <div class="sm mut" id="coinUpd">price ${L.ts ? agoS(L.ts) : "loading…"} · holders ${L.rcTs ? agoS(L.rcTs) : "loading…"}</div>
+    ${dexInfoPlaceholder(m)}
+    ${coinChartMeta(m)}
     <div class="kv3" style="margin-top:.6rem"><div><b>${L.price ? px(L.price) : "–"}</b><span class="mut sm">price (live)</span></div>
       <div><b>${L.mcap ? kusd(L.mcap) : "–"}</b><span class="mut sm">market cap</span></div><div><b>${L.liq ? kusd(L.liq) : c.liq ? kusd(c.liq) : "–"}</b><span class="mut sm">liquidity</span></div>
       <div><b>${L.age != null ? (L.age < 90 ? Math.round(L.age) + " min" : (L.age / 60).toFixed(1) + " h") : c.age_min != null ? Math.round(c.age_min) + " min" : "–"}</b><span class="mut sm">pool age</span></div>
@@ -1094,6 +1236,7 @@ function renderCoin() {
   el.querySelectorAll("[data-pick]").forEach(n => n.onclick = () => { coinSel = n.dataset.pick; renderCoin(); fetchHolders(coinSel); fetchLive(); });
   $("coinBack").onclick = () => show(coinFrom && coinFrom !== "coin" ? coinFrom : "agents");
   renderHeader();
+  refreshDexInfo(m);
 }
 function openCoin(m) { coinFrom = view; coinSel = m; show("coin"); fetchHolders(m); fetchLive(); }
 function pnlCards(A) {
@@ -1232,6 +1375,7 @@ function renderRace() {
 }
 setInterval(() => { if (view === "agents" || view === "coin") tickUpd(); }, 1000);
 setInterval(() => { if (view === "coin" && coinSel) fetchHolders(coinSel); }, 30000);
+setInterval(scheduleDexInfoRefresh, 45000);
 setInterval(fetchLive, 20000);
 
 function show(v) {
