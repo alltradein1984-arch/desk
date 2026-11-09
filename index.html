@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="referrer" content="no-referrer">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' https: data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' https: data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self' https://api.dexscreener.com https://api.rugcheck.xyz; frame-src https://dexscreener.com; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="theme-color" content="#07090c">
 <title>Desk</title>
 <script>
@@ -81,7 +81,7 @@ ul.plain{list-style:none;margin:0;padding:0}ul.plain li{padding:.45rem 0;border-
 .item{padding:.75rem 0;border-bottom:1px solid var(--line)}.item:last-child{border:0}
 .lg{width:34px;height:34px;font-size:.75rem}
 nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:6;display:flex;background:rgba(10,13,17,.97);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
-nav.tabs button{flex:1;background:none;border:0;color:var(--mut);padding:.55rem 0 .6rem;font-size:.72rem;display:flex;flex-direction:column;align-items:center;gap:2px}
+nav.tabs button{flex:1;min-width:0;background:none;border:0;color:var(--mut);padding:.55rem 0 .6rem;font-size:.72rem;display:flex;flex-direction:column;align-items:center;gap:2px}
 nav.tabs button svg{width:22px;height:22px}
 nav.tabs button.on{color:var(--txt)}
 
@@ -117,6 +117,27 @@ html[data-theme="light"] .btn{color:#fff}html[data-theme="light"] .btn.ghost{col
   .split-trades{display:block}
   #v-home .homegrid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;align-items:start}
 }
+
+/* Agents + Race tabs: always the dark app look (PAPER) */
+@media(max-width:480px){nav.tabs button{font-size:.55rem;padding:.5rem 0 .55rem}nav.tabs button svg{width:19px;height:19px}}
+#v-agents,#v-race,#v-coin{--bg:#000;--card:#0d1014;--card2:#151a21;--line:#1f262f;--txt:#eef2f6;--mut:#8792a2;--grn:#2fd27a;--red:#ff5468;--amb:#ffb648;color:var(--txt);background:#000;margin:-1rem -1rem 0;padding:1rem;min-height:100vh}
+.agcard{background:var(--card);border-color:var(--line)}
+.agbig{font-size:2rem;font-weight:800;letter-spacing:-.02em;margin:.2rem 0}
+.agsplit{display:grid;grid-template-columns:1fr;gap:0}@media(min-width:720px){.agsplit{grid-template-columns:1fr 1fr;gap:.9rem}}
+.kv3{display:grid;grid-template-columns:repeat(3,1fr);gap:.4rem;margin:.6rem 0}.kv3>div{display:flex;flex-direction:column;background:var(--card2);border-radius:10px;padding:.45rem .5rem}
+.agscroll{display:flex;gap:.6rem;overflow-x:auto;padding:.5rem 0 .2rem;scroll-snap-type:x mandatory}
+.agc{flex:0 0 230px;scroll-snap-align:start;background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:.7rem}
+.agdot{width:9px;height:9px;border-radius:50%;background:#ff5468;margin-right:.4rem;display:inline-block}.agdot.on{background:#2fd27a;box-shadow:0 0 0 0 rgba(47,210,122,.6);animation:pl 1.6s infinite}
+.agst{display:grid;grid-template-columns:1fr 1fr;gap:.3rem;margin-top:.4rem}.agst>div{display:flex;flex-direction:column;font-size:.78rem}
+.pdot{display:inline-block;width:8px;height:8px;border-radius:50%;margin:0 .25rem 0 .1rem}
+.pulse{display:inline-block;width:8px;height:8px;border-radius:50%;background:#2fd27a;margin-left:.35rem;animation:pl 1.2s infinite}
+@keyframes pl{0%{box-shadow:0 0 0 0 rgba(47,210,122,.7)}70%{box-shadow:0 0 0 8px rgba(47,210,122,0)}100%{box-shadow:0 0 0 0 rgba(47,210,122,0)}}
+.trow{display:grid;grid-template-columns:1.6rem minmax(0,9.5rem) 1fr 4.2rem;align-items:center;gap:.4rem;padding:.22rem 0;font-size:.82rem}
+.tr-n{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tr-b{height:10px;background:var(--card2);border-radius:5px;overflow:hidden}.tr-b span{display:block;height:100%;border-radius:5px}.tr-v{text-align:right}
+.tap{cursor:pointer}.agt{width:100%;font-size:.82rem;border-collapse:collapse;margin-top:.4rem}.agt td{padding:.2rem 0}.agt td:not(:first-child){text-align:right}
+.mbars{display:flex;gap:.3rem;overflow-x:auto;margin-top:.5rem}.mb{flex:1 0 54px;text-align:center}.mbv{height:74px;display:flex;align-items:flex-end;justify-content:center}.mbv span{width:60%;border-radius:4px 4px 0 0}
+.rbar{position:absolute;left:0;right:0;height:26px;transition:transform .9s ease,opacity .6s}.rb{position:absolute;left:0;top:3px;height:20px;border-radius:5px;transition:width .9s ease;opacity:.85}
+.rl{position:absolute;left:.4rem;top:4px;font-size:.8rem;white-space:nowrap;text-shadow:0 1px 2px #000}
 </style>
 </head>
 <body>
@@ -126,15 +147,21 @@ html[data-theme="light"] .btn{color:#fff}html[data-theme="light"] .btn.ghost{col
   <button id="theme" title="Theme: Auto = light 22:00-07:00, dark in the day">Auto</button>
 </header>
 <nav class="tabs" id="tabs">
+  <button data-v="agents"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="7" width="16" height="12" rx="3"/><path d="M12 3v4M9 12h.01M15 12h.01M9 16h6"/></svg>Agents</button>
   <button data-v="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Home</button>
   <button data-v="audit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg>Auditor</button>
   <button data-v="coins"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="9" r="6"/><path d="M15.5 9.5a6 6 0 1 1-6 6"/></svg>Coins</button>
   <button data-v="trades"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>Trades</button>
   <button data-v="whales"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 13c0 4 4 6 9 6s9-3 9-8c0-2-1-3-2-3-2 0-2 3-5 3S9 8 6 8c-2 0-3 2-3 5z"/><path d="M19 8c0-2 1-3 2-4"/></svg>Whales</button>
+  <button data-v="coin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 18l5-6 4 3 7-9"/><circle cx="20" cy="6" r="1.5"/></svg>Coin</button>
+  <button data-v="race"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V4M8 8h10M8 12h6M8 16h12"/></svg>Race</button>
   <button data-v="events"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Events</button>
 </nav>
 <div id="lock"><h2>Locked</h2><p class="mut" id="lockmsg">Open your secret desk link (the one ending in #t=…) once on this device.</p></div>
 <main id="app">
+  <section class="view" id="v-agents"></section>
+  <section class="view" id="v-race"></section>
+  <section class="view" id="v-coin"></section>
   <section class="view" id="v-home"></section>
   <section class="view" id="v-audit"><div class="split"><div id="auditPane"></div><div class="split-trades" id="splitTrades"></div></div></section>
   <section class="view" id="v-coins"></section>
@@ -469,9 +496,20 @@ function renderWhales() {
   const lg = V.log.map(t => `<li><div class="row"><span class="stage ${t.side === "buy" ? "st-held" : "st-rejected"}">${esc(t.side)}</span>
       <b class="sm">${esc(t.who)}</b><span class="sm">${esc(t.sym || shortMint(t.mint))} · $${Math.round(t.usd || 0).toLocaleString()}</span>
       <span class="sp"></span><span class="sm mut">${tm(t.ts)}</span></div></li>`).join("");
+  const A = V.auto;
+  const autoCard = !A ? "" : `<div class="card"><div class="row"><b>🧪 Auto PAPER trades</b><span class="sp"></span><span class="stage">${A.enabled ? "auto on" : "auto off"}</span></div>
+      <div class="row" style="margin:.35rem 0"><b style="font-size:1.35rem" class="${cls(A.pnl)}">${usd(A.pnl, 1)}</b><span class="mut sm" style="margin-left:.4rem">closed · open ${usd(A.open_pnl, 1)}</span><span class="sp"></span>
+      <span class="sm">${A.trades} trades · win ${A.win_rate != null ? Math.round(A.win_rate * 100) + "%" : "–"}</span></div>
+      <table style="width:100%;font-size:.85rem;border-collapse:collapse"><tr class="mut"><td>Tier</td><td style="text-align:right">Trades</td><td style="text-align:right">Open</td><td style="text-align:right">Win</td><td style="text-align:right">P&amp;L</td></tr>
+      ${A.tiers.map(b => `<tr><td>${esc(b.tier)} <span class="mut sm">$${A.rules.sizes[b.tier] || ""}</span></td><td style="text-align:right">${b.trades}</td><td style="text-align:right">${b.open}</td>
+        <td style="text-align:right">${b.win_rate != null ? Math.round(b.win_rate * 100) + "%" : "–"}</td><td style="text-align:right" class="${cls(b.pnl + b.open_pnl)}">${usd(b.pnl + b.open_pnl, 1)}</td></tr>`).join("")}</table>
+      ${(A.recent || []).slice(0, 8).map(r => `<div class="sm" style="margin-top:.3rem">${esc(r.sym || shortMint(r.mint))} <span class="stage">${esc(r.tier)}</span> $${r.size}
+        · <b class="${cls(r.pnl)}">${usd(r.pnl, 1)}</b> ${r.closed ? `<span class="mut">${esc(r.reason || "")}</span>` : `<span class="stage st-watch">open</span>`} <span class="mut">${tm(r.opened)}</span></div>`).join("")}
+      <p class="sm mut">PAPER only - simulated with slippage + FOMO fees, no real money. Sells ${A.rules.tp_sell_pct}% at +${A.rules.tp_pct}%, trails the rest, stop -${A.rules.stop_pct}%, max ${A.rules.max_per_day}/day. /autopaper on|off</p></div>`;
   $("v-whales").innerHTML = `<div class="card"><div class="row"><b>🐋 Whales</b><span class="sp"></span><span class="stage">${V.enabled ? "alerts on" : "alerts off"}</span></div>
       <div style="margin:.35rem 0"><b style="font-size:1.35rem">${V.traded_today} of ${V.followed}</b> <span class="mut">whales traded today</span></div>
       <p class="sm mut">PAPER · alerts only. 2+ wallets within ${V.settings.window_min} min = "Possible coin to invest in". You tap every buy yourself.</p></div>
+    ${autoCard}
     <div class="card"><div class="row"><b>If you had copied them</b><span class="sp"></span><b class="${cls(eq.pnl)}">${usd(eq.pnl, 1)}</b></div>
       <div class="sm mut">Hypothetical PAPER: $${eq.per_trade} per copied buy, sold when they sold · ${eq.copied} copies, ${eq.open} open · last ${eq.days} days</div>
       ${eqSvg(eq.points)}</div>
@@ -480,11 +518,309 @@ function renderWhales() {
     <div class="card"><b>Followed wallets (top ${V.wallets.length})</b>${w}</div>`;
 }
 
+// ================= Agents tab (agentsview.py) · PAPER only, real desk data, nothing here trades =================
+const PLAT_C = { "FOMO": "#5aa9ff", "GMGN": "#ffb648", "pump.fun": "#3ee0c5" };
+const LIVE = {}; let liveTs = 0, agSel = null, agSort = "pnl";
+const raceSt = { i: 0, play: true, timer: null };
+const kfmt = x => x == null ? "–" : Math.abs(x) >= 1e6 ? (x / 1e6).toFixed(2) + "M" : Math.abs(x) >= 1e3 ? (x / 1e3).toFixed(1) + "K" : Math.round(x).toString();
+const kusd = x => x == null ? "–" : (x < 0 ? "-$" : "$") + kfmt(Math.abs(x));
+const secAgo = ts => ts ? Math.max(0, Math.round(Date.now() / 1000 - ts)) : null;
+const agoS = ts => { const s = secAgo(ts); return s == null ? "–" : s < 90 ? `${s}s ago` : s < 5400 ? `${Math.round(s / 60)} min ago` : `${(s / 3600).toFixed(1)} h ago`; };
+const isMint = m => typeof m === "string" && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(m);
+const platDots = ps => (ps || []).map(p => `<span class="pdot" style="background:${PLAT_C[p] || "#888"}"></span>`).join("");
+function livePnl(p) {
+  const L = LIVE[p.mint]; const price = L && L.price ? L.price : p.last;
+  if (!price || !p.entry) return { pnl: p.pnl, price: p.last, live: false };
+  const pnl = (p.realized || 0) + p.size * (p.remaining ?? 1) * price / p.entry - p.size - (p.buy_fee || 0);
+  return { pnl, price, live: !!(L && L.price) };
+}
+async function fetchLive() {
+  const A = D && D.agentsx; if (!A) return;
+  const ms = [...new Set([...A.open.map(p => p.mint), ...A.alerts.map(a => a.mint), ...(coinSel ? [coinSel] : [])].filter(isMint))].slice(0, 30);
+  if (!ms.length) return;
+  try {
+    const r = await fetch(`https://api.dexscreener.com/tokens/v1/solana/${ms.join(",")}`, { cache: "no-store", referrerPolicy: "no-referrer" });
+    const pairs = await r.json();
+    for (const m of ms) {
+      const ps = (pairs || []).filter(p => p.baseToken && p.baseToken.address === m);
+      if (!ps.length) continue;
+      const b = ps.reduce((a, p) => ((p.liquidity || {}).usd || 0) > ((a.liquidity || {}).usd || 0) ? p : a);
+      LIVE[m] = { price: +b.priceUsd || null, mcap: b.marketCap || b.fdv || null, liq: (b.liquidity || {}).usd || null,
+                  pair: b.pairAddress, age: b.pairCreatedAt ? (Date.now() - b.pairCreatedAt) / 60000 : null, sym: (b.baseToken || {}).symbol, ts: Date.now() / 1000 };
+    }
+    liveTs = Date.now() / 1000;
+    if (view === "agents") renderAgents(true); else if (view === "coin") renderCoin();
+  } catch (e) { console.warn("live prices", e); }
+}
+async function fetchHolders(m) {
+  if (!isMint(m)) return;
+  try {
+    const r = await fetch(`https://api.rugcheck.xyz/v1/tokens/${m}/report`, { cache: "no-store", referrerPolicy: "no-referrer" });
+    if (!r.ok) throw new Error(r.status);
+    const j = await r.json();
+    const top = (j.topHolders || []).slice(0, 20), top10 = top.slice(0, 10).reduce((a, h) => a + (h.pct || 0), 0);
+    const tk = j.token || {};
+    LIVE[m] = Object.assign(LIVE[m] || {}, { holders: Number.isFinite(j.totalHolders) ? j.totalHolders : null, rugged: !!j.rugged, rcTs: Date.now() / 1000,
+      rc: { total: Number.isFinite(j.totalHolders) ? j.totalHolders : null, top, top10: top.length ? top10 : null, markets: j.markets || [], known: j.knownAccounts || {},
+            nets: j.insiderNetworks || [], creator: j.creator, creatorBalance: j.creatorBalance, supply: tk.supply, decimals: tk.decimals } });
+  } catch (e) { LIVE[m] = Object.assign(LIVE[m] || {}, { rcErr: true, rcTs: Date.now() / 1000 }); }
+  if (view === "coin" && coinSel === m) renderCoin();
+}
+function curveSvg(pts, h = 110) {
+  if (!pts || pts.length < 2) return `<p class="sm mut">The curve starts after the first PAPER trade closes.</p>`;
+  const W = 340, H = h, xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const X = t => ((t - x0) / ((x1 - x0) || 1)) * W, Y = v => H - 6 - ((v - y0) / ((y1 - y0) || 1)) * (H - 12);
+  const line = pts.map(p => `${X(p[0]).toFixed(1)},${Y(p[1]).toFixed(1)}`).join(" ");
+  const up = ys[ys.length - 1] >= ys[0], c = up ? "#2fd27a" : "#ff5468";
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:${H}px"><polygon points="0,${H} ${line} ${W},${H}" fill="${c}" fill-opacity=".12"/>
+    <polyline points="${line}" fill="none" stroke="${c}" stroke-width="2"/><circle cx="${X(xs[xs.length - 1])}" cy="${Y(ys[ys.length - 1])}" r="4" fill="${c}"/></svg>`;
+}
+function hbAge(id) { const t = (D.agents || {})[id]; return t ? secAgo(t) : null; }
+function agentCard(a) {
+  const age = hbAge(a.id), on = age != null && age < 120;
+  return `<div class="agc"><div class="row"><span class="agdot ${on ? "on" : ""}"></span><b>${esc(a.name)}</b><span class="sp"></span><span class="sm ${on ? "grn" : "red"}">${on ? "running" : age == null ? "no heartbeat" : "idle"}</span></div>
+    <div class="sm mut">heartbeat ${age == null ? "–" : agoS(D.agents[a.id])}</div>
+    <div class="agst">${a.stats.map(s => `<div><b>${esc(kfmt(s.v))}</b><span class="mut">${esc(s.k)}</span></div>`).join("")}</div>
+    ${a.last ? `<div class="sm" style="margin-top:.35rem">${esc(a.last.text)}</div><div class="sm mut">${esc(a.last.why || "")} · ${agoS(a.last.ts)}</div>` : `<div class="sm mut" style="margin-top:.35rem">No action yet.</div>`}</div>`;
+}
+function posRow(p) {
+  const L = livePnl(p), pc = p.size ? L.pnl / p.size * 100 : null;
+  return `<div class="item tap" data-coin="${esc(p.mint)}"><div class="row"><b>${esc(p.sym || shortMint(p.mint))}</b>
+    <span class="stage">${p.book === "auto" ? "auto · " + esc(p.tier) : p.book === "manual" ? "yours (logged)" : "desk"}</span><span class="sp"></span>
+    <b class="${cls(L.pnl)}">${usd(L.pnl, 1)} <span class="sm">${pct(pc)}</span></b></div>
+    <div class="sm mut">PAPER $${p.size} · entry ${px(p.entry)} → ${L.live ? "live" : "last"} ${px(L.price)}${LIVE[p.mint] && LIVE[p.mint].mcap ? " · MC " + kusd(LIVE[p.mint].mcap) : ""} · ${tm(p.opened)}</div></div>`;
+}
+function botCard(b, kind) {
+  if (!b) return `<div class="card agcard"><b>Trader bot</b><p class="sm mut">No Trader bot data on the box.</p></div>`;
+  if (kind === "coin") {
+    const A = D.agentsx, upnl = A.open.reduce((s, p) => s + (livePnl(p).pnl || 0), 0), bal = b.start + b.realized + upnl;
+    return `<div class="card agcard"><div class="row"><b>🪙 Coin bot</b><span class="sp"></span><span class="badge b-paper">PAPER · LIVE</span></div>
+      <div class="agbig">${usd(bal)}</div><div class="sm ${cls(bal - b.start)}">${usd(bal - b.start, 1)} (${pct((bal / b.start - 1) * 100)}) since $${b.start}</div>
+      <div class="kv3"><div><b>${A.open.length}</b><span class="mut sm">open</span></div><div><b>${b.win_rate != null ? Math.round(b.win_rate * 100) + "%" : "–"}</b><span class="mut sm">win rate (${b.closed})</span></div>
+      <div><b class="${cls(b.realized)}">${usd(b.realized, 1)}</b><span class="mut sm">closed P&amp;L</span></div></div>
+      ${A.open.map(posRow).join("") || `<p class="sm mut">No open PAPER positions.</p>`}</div>`;
+  }
+  return `<div class="card agcard"><div class="row"><b>📈 Trader bot</b><span class="sp"></span><span class="badge b-paper">PAPER · BACKTEST</span></div>
+    <div class="agbig">${usd(b.balance)}</div><div class="sm ${cls(b.pnl)}">${usd(b.pnl, 1)} (${pct(b.pct)}) on $${b.start} · hold would be ${usd(b.hold_value)}</div>
+    <div class="kv3"><div><b>${b.fills}</b><span class="mut sm">fills</span></div><div><b>–</b><span class="mut sm">win rate (grid)</span></div>
+    <div><b class="${cls(b.grid_profit)}">${usd(b.grid_profit, 1)}</b><span class="mut sm">grid profit</span></div></div>
+    ${b.coins.map(c => `<div class="item"><div class="row"><b>${esc(c.coin)}</b><span class="sp"></span><b class="${cls(c.value - c.start)}">${usd(c.value)}</b></div>
+      <div class="sm mut">${c.fills} fills · grid ${usd(c.grid_profit, 1)} · DCA $${c.dca} · max drop ${c.mdd}%</div></div>`).join("")}
+    <p class="sm amb">${esc(b.status)}. Open positions: not tracked until it runs live in PAPER.</p></div>`;
+}
+function tradersChart(trs) {
+  const T = [...trs].sort((a, b) => agSort === "pnl" ? (b.pnl || 0) - (a.pnl || 0) : (b.consistency ?? -99) - (a.consistency ?? -99));
+  const mx = Math.max(...T.map(t => Math.sqrt(Math.abs(agSort === "pnl" ? t.pnl || 0 : (t.consistency ?? 0) + 10))), 1);
+  const now = Date.now() / 1000;
+  return T.map((t, i) => {
+    const v = agSort === "pnl" ? t.pnl || 0 : (t.consistency ?? 0) + 10, w = Math.max(2, Math.sqrt(Math.abs(v)) / mx * 100);
+    const pulse = t.last_buy && now - t.last_buy < 900;
+    return `<div class="trow tap" data-trader="${esc(t.wallet)}"><span class="mut sm tr-i">${i + 1}</span>
+      <span class="tr-n">${platDots(t.platforms)}${t.multi ? `<b title="on several boards">◆</b>` : ""}${esc(t.handle)}${pulse ? `<span class="pulse"></span>` : ""}</span>
+      <span class="tr-b"><span style="width:${w}%;background:${(t.pnl || 0) < 0 && agSort === "pnl" ? "#ff5468" : PLAT_C[t.platforms[0]] || "#888"}"></span></span>
+      <span class="sm tr-v">${agSort === "pnl" ? kusd(t.pnl) : t.consistency ?? "–"}</span></div>`;
+  }).join("");
+}
+function traderView(t) {
+  const mx = Math.max(...t.months.map(m => Math.abs(m.pnl || 0)), 1);
+  const bars = t.months.map(m => `<div class="mb"><div class="mbv"><span style="height:${Math.max(2, Math.abs(m.pnl || 0) / mx * 70)}px;background:${(m.pnl || 0) >= 0 ? "#2fd27a" : "#ff5468"}"></span></div>
+    <div class="sm">${esc(m.m.slice(2))}</div><div class="sm mut">${m.wins ?? "–"}W ${m.losses ?? "–"}L</div><div class="sm ${cls(m.pnl)}">${kusd(m.pnl)}</div></div>`).join("");
+  const con = Object.entries(t.contrib || {});
+  return `<div class="card agcard"><button class="btn ghost" id="agBack">← Back to chart</button>
+    <h2 style="margin:.6rem 0 .1rem">${esc(t.handle)}</h2><div class="sm">${platDots(t.platforms)} ${esc(t.platforms.join(" · "))}${t.multi ? " · ◆ multi-platform" : ""}</div>
+    <div class="sm mut" style="word-break:break-all;margin:.4rem 0"><code>${esc(t.wallet)}</code></div>
+    <div class="row" style="gap:.5rem"><button class="btn ghost" id="agCopy" data-w="${esc(t.wallet)}">Copy wallet</button><a class="btn ghost" href="${esc(safeUrl(t.gmgn) || "#")}" target="_blank" rel="noopener noreferrer">Open on GMGN</a></div>
+    <div class="kv3" style="margin-top:.7rem"><div><b class="${cls(t.pnl)}">${kusd(t.pnl)}</b><span class="mut sm">~6-month realized PnL</span></div>
+      <div><b>${t.win_rate != null ? Math.round(t.win_rate * 100) + "%" : "–"}</b><span class="mut sm">win rate (${t.wins ?? "–"}W/${t.losses ?? "–"}L)</span></div>
+      <div><b>${t.hold_min != null ? Math.round(t.hold_min) + " min" : "–"}</b><span class="mut sm">avg (median) hold</span></div></div>
+    <div class="sm" style="margin-top:.5rem">Score ${t.score != null ? Math.round(t.score) : "–"} · consistency ${t.consistency ?? "–"} · ${esc(t.label || "–")} · ${t.followed ? `followed #${t.rank}` : "not followed"}</div>
+    <div class="sm mut">${esc(t.boards.join(" · "))}</div></div>
+  <div class="card agcard"><b>Wins / losses per month</b><div class="mbars">${bars || `<p class="sm mut">No monthly history for this wallet.</p>`}</div></div>
+  <div class="card agcard"><b>Recent buys / sells</b>${t.recent.map(r => `<div class="row sm" style="margin-top:.3rem"><span class="stage ${r.side === "buy" ? "st-held" : "st-rejected"}">${esc(r.side)}</span>
+    <span>${esc(r.sym || shortMint(r.mint))} · $${(r.usd || 0).toLocaleString()}</span><span class="sp"></span><span class="mut">${tm(r.ts)}</span></div>`).join("") || `<p class="sm mut">No trades seen by the follow poller yet.</p>`}</div>
+  <div class="card agcard"><b>Coins they pile into</b>${t.piles.map(c => `<div class="row sm" style="margin-top:.3rem"><b>${esc(c.sym || shortMint(c.mint))}</b><span class="sp"></span>$${(c.usd || 0).toLocaleString()} · ${c.n} buys</div>`).join("") || `<p class="sm mut">None seen yet.</p>`}
+    <div class="sm" style="margin-top:.6rem"><b>Alert tiers they helped trigger:</b> ${con.length ? con.map(([k, n]) => `${esc(k)} ×${n}`).join(" · ") : "none yet"}</div></div>`;
+}
+const BURN = new Set(["1nc1nerator11111111111111111111111111111111", "11111111111111111111111111111111"]);
+let coinSel = null, coinFrom = "agents";
+function realHolders(R, A) {
+  // RugCheck report = the same source as the desk's bubble-map (insider network) check in agents/auditor.py
+  if (!R || R.total == null) return null;
+  const known = R.known || {}, excl = new Set();
+  for (const m of R.markets || []) [m.pubkey, m.liquidityA, m.liquidityB, (m.liquidityAAccount || {}).owner, (m.liquidityBAccount || {}).owner].forEach(x => x && excl.add(x));
+  let lp = 0, burn = 0;
+  for (const h of R.top || []) {
+    const k = known[h.owner] || known[h.address] || {};
+    if (excl.has(h.owner) || excl.has(h.address) || /AMM|LOCKER|POOL|CURVE/i.test(k.type || "") || /curve|pool|amm/i.test(k.name || "")) lp++;
+    else if (BURN.has(h.owner) || /BURN|DEAD/i.test(k.type || "") || /burn|dead|incinerat/i.test(k.name || "")) burn++;
+  }
+  const nets = (R.nets || []).filter(n => (n.size || 0) >= (A.bundle_min || 3) && (n.currentHolding || 0) > 0);
+  const linked = nets.reduce((s, n) => s + (n.activeAccounts || n.size || 0), 0);
+  const sup = R.supply && R.decimals != null ? R.supply / 10 ** R.decimals : R.supply;
+  const held = nets.reduce((s, n) => s + (n.currentHolding || n.tokenAmount || 0), 0);
+  const heldPct = sup && held ? held / (R.supplyRaw ? R.supplyRaw : sup) * 100 : null;
+  const real = Math.max(0, R.total - lp - burn - Math.max(0, linked - nets.length));
+  return { total: R.total, real, lp, burn, linked, clusters: nets.length, heldPct };
+}
+function priceSvg(series, marks) {
+  if (!series || series.length < 2) return `<p class="sm mut">Not enough desk price samples yet for the PAPER entry/exit chart.</p>`;
+  const W = 340, H = 120, xs = series.map(p => p[0]).concat(marks.map(m => m.t)), ys = series.map(p => p[1]).concat(marks.map(m => m.p).filter(Boolean));
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const X = t => 6 + ((t - x0) / ((x1 - x0) || 1)) * (W - 12), Y = v => H - 8 - ((v - y0) / ((y1 - y0) || 1)) * (H - 16);
+  const line = series.map(p => `${X(p[0]).toFixed(1)},${Y(p[1]).toFixed(1)}`).join(" ");
+  const mk = marks.filter(m => m.p).map(m => `<circle cx="${X(m.t)}" cy="${Y(m.p)}" r="5" fill="${m.k === "buy" ? "#2fd27a" : "#ff5468"}" stroke="#000"/><text x="${Math.min(W - 40, X(m.t) + 6)}" y="${Y(m.p) - 7}" fill="#eef2f6" font-size="10">${m.k === "buy" ? "PAPER buy" : "PAPER sell"}</text>`).join("");
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:${H}px"><polyline points="${line}" fill="none" stroke="#5aa9ff" stroke-width="1.6"/>${mk}</svg>`;
+}
+function coinList(A) {
+  return [...new Map(A.open.concat(A.closed).map(p => [p.mint, p.sym])).entries()].concat(A.alerts.filter(a => isMint(a.mint)).map(a => [a.mint, null]))
+    .filter((x, i, arr) => arr.findIndex(y => y[0] === x[0]) === i).slice(0, 14);
+}
+function renderCoin() {
+  const el = $("v-coin"), A = D && D.agentsx;
+  if (!A) { el.innerHTML = `<div class="card mut">Coin data not in this feed yet.</div>`; return; }
+  const list = coinList(A); const m = coinSel || (list[0] || [])[0];
+  if (!m) { el.innerHTML = `<div class="card agcard">No open PAPER positions or alert coins yet.</div>`; return; }
+  coinSel = m;
+  if (!LIVE[m] || !LIVE[m].rcTs) fetchHolders(m);
+  const c = (A.coins || {})[m] || {}, L = LIVE[m] || {}, R = L.rc, ps = A.open.concat(A.closed).filter(p => p.mint === m);
+  const rh = realHolders(R, A), F = A.followed || {};
+  const chips = list.map(([mm, s]) => `<button class="btn ${mm === m ? "" : "ghost"}" data-pick="${esc(mm)}" style="margin:0 .3rem .3rem 0">${esc(s || (A.coins[mm] || {}).sym || (LIVE[mm] || {}).sym || shortMint(mm))}</button>`).join("");
+  const pair = L.pair && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(L.pair) ? L.pair : m;
+  const embed = A.embed_base && /^https:\/\/dexscreener\.com\/[a-z]+\/$/.test(A.embed_base) ? `${A.embed_base}${pair}?embed=1&theme=dark&chartTheme=dark&info=0&trades=0&chartLeftToolbar=0&interval=5` : null;
+  const marks = ps.flatMap(p => [{ t: p.opened, p: p.entry, k: "buy" }].concat(p.closed ? [{ t: p.closed, p: p.exit, k: "sell" }] : []));
+  const top = (R && R.top) || [], known = (R && R.known) || {}, lpSet = new Set();
+  for (const mk of (R && R.markets) || []) [mk.pubkey, mk.liquidityA, mk.liquidityB, (mk.liquidityAAccount || {}).owner].forEach(x => x && lpSet.add(x));
+  const creator = (R && R.creator) || c.creator;
+  const labels = h => { const k = known[h.owner] || {}, out = [];
+    if (creator && h.owner === creator) out.push("dev / creator");
+    if (lpSet.has(h.owner) || lpSet.has(h.address) || /AMM|POOL|CURVE/i.test(k.type || "")) out.push("LP / pool");
+    if (BURN.has(h.owner) || /BURN/i.test(k.type || "")) out.push("burn");
+    if (h.insider) out.push("insider / linked");
+    if (F[h.owner]) out.push(`followed #${F[h.owner].r} ${F[h.owner].h}`), F[h.owner].sn && out.push("sniper");
+    if (k.name && !out.length) out.push(k.name);
+    return out; };
+  const sup = R && R.supply ? R.supply / 10 ** (R.decimals || 0) : null;
+  const devPct = R && R.creatorBalance != null && sup ? R.creatorBalance / 10 ** (R.decimals || 0) / sup * 100 : (c.dev_pct != null ? +c.dev_pct : null);
+  el.innerHTML = `<div class="card agcard"><div class="row"><button class="btn ghost" id="coinBack">← Back</button><span class="sp"></span><span class="badge b-paper">PAPER</span></div>
+    <div style="margin-top:.6rem">${chips}</div>
+    <h2 style="margin:.4rem 0 .1rem">${esc(c.sym || L.sym || shortMint(m))}</h2><div class="sm mut" style="word-break:break-all"><code>${esc(m)}</code></div>
+    <div class="sm mut" id="coinUpd">price ${L.ts ? agoS(L.ts) : "loading…"} · holders ${L.rcTs ? agoS(L.rcTs) : "loading…"}</div>
+    <div class="kv3" style="margin-top:.6rem"><div><b>${L.price ? px(L.price) : "–"}</b><span class="mut sm">price (live)</span></div>
+      <div><b>${L.mcap ? kusd(L.mcap) : "–"}</b><span class="mut sm">market cap</span></div><div><b>${L.liq ? kusd(L.liq) : c.liq ? kusd(c.liq) : "–"}</b><span class="mut sm">liquidity</span></div>
+      <div><b>${L.age != null ? (L.age < 90 ? Math.round(L.age) + " min" : (L.age / 60).toFixed(1) + " h") : c.age_min != null ? Math.round(c.age_min) + " min" : "–"}</b><span class="mut sm">pool age</span></div>
+      <div><b>${R && R.top10 != null ? R.top10.toFixed(1) + "%" : c.top10 != null ? (+c.top10).toFixed(1) + "%" : "unknown"}</b><span class="mut sm">top-10 hold</span></div>
+      <div><b>${devPct != null ? devPct.toFixed(2) + "%" : "unknown"}</b><span class="mut sm">dev / creator holds</span></div></div>
+    <div class="sm"><b>Holders: ${rh ? rh.total.toLocaleString() + " total, ~" + rh.real.toLocaleString() + " real" : (L.rcTs ? "unknown · real holders: unknown" : "loading…")}</b></div>
+    ${rh ? `<div class="sm mut">Real = total minus ${rh.lp} LP/pool/curve account(s), ${rh.burn} burn address(es) and ${Math.max(0, rh.linked - rh.clusters)} linked wallets (${rh.linked} wallets in ${rh.clusters} cluster(s), each cluster counted once). Dust wallets (&lt;$1) are NOT excluded - RugCheck has no full holder list - so the real number is lower.</div>` : ""}
+    <div class="sm" style="margin-top:.4rem"><b>Bubble map (linked wallets):</b> ${rh ? `${rh.clusters} cluster(s), ${rh.linked} linked wallets${rh.heldPct != null ? `, ${rh.heldPct.toFixed(1)}% of supply` : ", % held unknown"}` : c.bundled != null ? `${esc(c.bundled)} linked wallets (desk rug check)` : "unknown"} · desk check: ${c.bundled != null ? esc(c.bundled) + " linked still holding" : "not run"}</div>
+    <div class="sm">Dev sold: ${c.dev_sold_pct != null ? esc((+c.dev_sold_pct).toFixed(0)) + "% of his launch bag" : "unknown"}${L.rugged ? ` · <b class="red">RugCheck marks it RUGGED</b>` : ""}</div>
+    <div class="sm" style="margin-top:.3rem">${c.rug ? `${esc(c.rug.text)} · <span class="mut">${esc(c.rug.why || "")}</span>` : "No desk rug check on file."}</div>
+    <div class="row" style="margin-top:.6rem;gap:.5rem">${fomoBtn(c.link || (ps[0] || {}).link)}${safeUrl(c.bubblemaps) ? `<a class="btn ghost" href="${esc(c.bubblemaps)}" target="_blank" rel="noopener noreferrer">Bubblemaps</a>` : ""}</div></div>
+  <div class="card agcard"><b>Live chart</b>${embed ? `<iframe src="${esc(embed)}" title="chart" style="width:100%;height:360px;border:0;border-radius:10px;margin-top:.5rem" loading="lazy" referrerpolicy="no-referrer"></iframe>` : ""}
+    <div class="sm mut" style="margin-top:.4rem">PAPER entry / exit on the desk's own price samples:</div>${priceSvg(c.series, marks)}</div>
+  <div class="card agcard"><b>Top holders</b>${top.length ? top.slice(0, 20).map((h, i) => { const lb = labels(h);
+    return `<div class="row sm" style="margin-top:.3rem"><span class="mut" style="width:1.4rem">${i + 1}</span><code>${esc(shortMint(h.owner))}</code>${lb.map(x => `<span class="stage" style="margin-left:.25rem">${esc(x)}</span>`).join("")}<span class="sp"></span><b>${(h.pct || 0).toFixed(2)}%</b></div>`; }).join("")
+    : `<p class="sm mut">${L.rcTs ? "Top holders: unknown (RugCheck gave no list)." : "Loading from RugCheck…"}</p>`}</div>
+  <div class="card agcard"><b>Followed traders holding it</b>${(c.followed_holders || []).map(h => `<div class="row sm" style="margin-top:.3rem"><b>#${h.rank} ${esc(h.handle)}</b><span class="sp"></span>bought $${(h.usd || 0).toLocaleString()}</div>`).join("") || `<p class="sm mut">None of the followed wallets holds it (by the trades the poller saw).</p>`}</div>
+  <div class="card agcard"><b>PAPER position</b>${ps.map(p => { const lp = p.closed ? { pnl: p.pnl } : livePnl(p);
+    return `<div class="item"><div class="row"><span class="stage">${p.book === "auto" ? "auto · " + esc(p.tier) : p.book === "manual" ? "yours (logged)" : "desk"}</span><span class="sp"></span><b class="${cls(lp.pnl)}">${usd(lp.pnl, 1)}</b></div>
+    <div class="sm mut">PAPER $${p.size} · entry ${px(p.entry)} · ${p.closed ? "closed " + tm(p.closed) + " · " + esc(p.reason || "") : "open since " + tm(p.opened)}</div></div>`; }).join("") || `<p class="sm mut">No PAPER position in this coin.</p>`}</div>`;
+  el.querySelectorAll("[data-pick]").forEach(n => n.onclick = () => { coinSel = n.dataset.pick; renderCoin(); fetchHolders(coinSel); fetchLive(); });
+  $("coinBack").onclick = () => show(coinFrom && coinFrom !== "coin" ? coinFrom : "agents");
+}
+function openCoin(m) { coinFrom = view; coinSel = m; show("coin"); fetchHolders(m); fetchLive(); }
+function renderAgents(keep) {
+  const el = $("v-agents"), A = D.agentsx;
+  if (!A) { el.innerHTML = `<div class="card mut">Agents data not in this feed yet.</div>`; return; }
+  const y = window.scrollY;
+  if (agSel && agSel.t === "trader") { const t = A.traders.find(x => x.wallet === agSel.id); if (t) el.innerHTML = traderView(t); else agSel = null; }
+  if (!agSel) {
+    const cb = A.coin_bot, tb = A.trader_bot, upnl = A.open.reduce((s, p) => s + (livePnl(p).pnl || 0), 0);
+    const cbBal = cb.start + cb.realized + upnl, tot = cbBal + ((tb || {}).balance || 0), st = A.combined.start;
+    const au = A.auto, wins = A.closed.filter(c => (c.pnl || 0) > 0).length;
+    el.innerHTML = `<div class="card agcard"><div class="row"><span class="badge b-paper">PAPER</span><span class="sp"></span><span class="sm mut" id="agUpd"></span></div>
+      <div class="mut sm" style="margin-top:.5rem">Combined PAPER balance · Coin bot + Trader bot</div>
+      <div class="agbig" style="font-size:2.6rem">${usd(tot)}</div>
+      <div class="sm ${cls(tot - st)}">${usd(tot - st, 1)} (${pct((tot / st - 1) * 100)}) on $${st}</div><div class="sm mut">${esc(A.combined.note)}</div>
+      ${curveSvg(cb.curve.slice(0, -1).concat([[Math.round(Date.now() / 1000), cbBal]]))}<div class="sm mut">Coin bot PAPER equity curve (closed trades + live open P&amp;L)</div></div>
+    <div class="agsplit">${botCard(cb, "coin")}${botCard(tb, "trader")}</div>
+    <div class="card agcard"><div class="row"><b>Agents</b><span class="sp"></span><span class="sm grn">${A.agents.filter(a => (hbAge(a.id) ?? 1e9) < 120).length} running</span></div>
+      <div class="agscroll">${A.agents.map(agentCard).join("")}</div></div>
+    <div class="card agcard"><div class="row"><b>🔔 Live alerts</b><span class="sp"></span><span class="sm mut">newest first</span></div>
+      ${A.alerts.map(a => `<div class="item ${isMint(a.mint) ? "tap" : ""}" data-coin="${esc(a.mint || "")}"><div class="row">${a.possible ? `<span class="stage st-held">Possible coin to invest in</span>` : `<span class="stage">${esc(a.kind.replace("_", " "))}</span>`}
+        ${a.tier ? `<span class="stage st-watch">${esc(a.tier)}</span>` : ""}<span class="sp"></span><span class="sm mut">${agoS(a.ts)}</span></div>
+        <div style="margin-top:.2rem"><b>${esc(a.title)}</b></div><div class="sm mut" style="white-space:pre-line">${esc(a.body)}</div>
+        ${a.url && a.kind !== "auto_paper" && a.kind !== "bedtime" ? `<div class="row" style="margin-top:.35rem"><span class="sp"></span>${fomoBtn(a.url, true)}</div>` : ""}</div>`).join("") || `<p class="sm mut">No alerts yet.</p>`}</div>
+    <div class="card agcard"><b>Activity</b><ul class="plain" style="margin-top:.4rem">${A.activity.slice(0, 15).map(e => `<li><div class="row"><b class="sm">${esc(e.agent)}</b><span class="sm">${esc(e.text)}</span><span class="sp"></span><span class="sm mut">${agoS(e.ts)}</span></div>${e.why ? `<div class="sm mut">because ${esc(e.why)}</div>` : ""}</li>`).join("")}</ul></div>
+    <div class="card agcard"><div class="row"><b>Closed PAPER trades</b><span class="sp"></span><span class="sm">win ${A.closed.length ? Math.round(wins / A.closed.length * 100) + "%" : "–"} of ${A.closed.length}</span></div>
+      ${A.closed.map(p => `<div class="item tap" data-coin="${esc(p.mint)}"><div class="row"><b>${esc(p.sym || shortMint(p.mint))}</b><span class="stage">${p.book === "auto" ? "auto · " + esc(p.tier) : p.book === "manual" ? "yours (logged)" : "desk"}</span><span class="sp"></span><b class="${cls(p.pnl)}">${usd(p.pnl, 1)}</b></div>
+        <div class="sm mut">PAPER $${p.size} · ${esc(p.reason || "")} · ${tm(p.closed)}</div></div>`).join("") || `<p class="sm mut">No closed PAPER trades yet.</p>`}</div>
+    <div class="card agcard"><div class="row"><b>🧪 Auto PAPER by tier</b><span class="sp"></span><span class="stage">${au.enabled ? "auto on" : "auto off"}</span></div>
+      <table class="agt"><tr class="mut"><td>Tier</td><td>Size</td><td>Trades</td><td>Open</td><td>Win</td><td>P&amp;L</td></tr>${au.tiers.map(b => `<tr><td>${esc(b.tier)}</td><td>$${au.rules.sizes[b.tier]}</td><td>${b.trades}</td><td>${b.open}</td><td>${b.win_rate != null ? Math.round(b.win_rate * 100) + "%" : "–"}</td><td class="${cls(b.pnl)}">${usd(b.pnl, 1)}</td></tr>`).join("")}</table>
+      <p class="sm mut">Simulated with slippage + FOMO fees. Sells ${au.rules.tp_sell_pct}% at +${au.rules.tp_pct}%, trails the rest ${au.rules.trail_pct}%, stop -${au.rules.stop_pct}%, rug exit at liquidity -${au.rules.liq_drop_pct}%, max ${au.rules.max_hold_h} h, ${au.rules.max_per_day}/day.</p></div>
+    <div class="card agcard"><div class="row"><b>Top 30 × 3 platforms (${A.traders.length} wallets)</b><span class="sp"></span>
+      <button class="btn ${agSort === "pnl" ? "" : "ghost"}" data-sort="pnl">PnL</button><button class="btn ${agSort === "cons" ? "" : "ghost"}" data-sort="cons" style="margin-left:.3rem">Consistency</button></div>
+      <div class="sm mut" style="margin:.3rem 0">${Object.entries(PLAT_C).map(([k, c]) => `<span class="pdot" style="background:${c}"></span>${k}`).join(" · ")} · ◆ on several boards · <span class="pulse"></span> bought in the last 15 min · tap a trader</div>
+      ${tradersChart(A.traders)}</div>`;
+  }
+  wireAgents(el);
+  if (keep) window.scrollTo(0, y);
+  tickUpd();
+}
+function wireAgents(el) {
+  el.querySelectorAll("[data-trader]").forEach(n => n.onclick = () => { agSel = { t: "trader", id: n.dataset.trader }; show("agents"); });
+  el.querySelectorAll("[data-coin]").forEach(n => { if (isMint(n.dataset.coin)) n.onclick = ev => { if (ev.target.closest("a")) return; openCoin(n.dataset.coin); }; });
+  el.querySelectorAll("[data-sort]").forEach(n => n.onclick = () => { agSort = n.dataset.sort; renderAgents(true); });
+  const b = $("agBack"); if (b) b.onclick = () => { const back = agSel && agSel.from; agSel = null; show(back || "agents"); };
+  const c = $("agCopy"); if (c) c.onclick = () => { navigator.clipboard && navigator.clipboard.writeText(c.dataset.w).then(() => c.textContent = "Copied ✓"); };
+}
+function tickUpd() {
+  const cu = $("coinUpd"); if (cu && coinSel) { const L = LIVE[coinSel] || {}; cu.textContent = `price ${L.ts ? agoS(L.ts) : "loading…"} · holders ${L.rcTs ? agoS(L.rcTs) : "loading…"} · data ${agoS((D.agentsx || {}).ts || D.ts)}`; }
+  const u = $("agUpd"); if (!u || !D) return;
+  u.textContent = `data ${agoS((D.agentsx || {}).ts || D.ts)} · prices ${liveTs ? agoS(liveTs) : "loading…"}`;
+}
+// ---- Race: cumulative ~6-month realized PnL per trader, month by month ----
+function renderRace() {
+  const el = $("v-race"), A = D.agentsx;
+  if (!A || !A.race.frames.length) { el.innerHTML = `<div class="card mut">No race data.</div>`; return; }
+  const byW = Object.fromEntries(A.traders.map(t => [t.wallet, t]));
+  el.innerHTML = `<div class="card agcard"><div class="row"><b>🏁 Trader race · realized PnL</b><span class="sp"></span><button class="btn ghost" id="raceBtn">${raceSt.play ? "Pause" : "Play"}</button></div>
+    <div class="sm mut">${A.traders.length} wallets from the FOMO, GMGN and pump.fun top 30 boards · cumulative realized PnL per month (GMGN wallet history) · tap a bar</div>
+    <div class="row"><b id="raceM" style="font-size:2rem"></b><span class="sp"></span><input type="range" id="raceR" min="0" max="${A.race.frames.length - 1}" value="${raceSt.i}" style="width:55%"></div>
+    <div id="raceBars" style="position:relative;height:${12 * 30}px"></div>
+    <div class="sm mut">${Object.entries(PLAT_C).map(([k, c]) => `<span class="pdot" style="background:${c}"></span>${k}`).join(" · ")} · <span class="pulse"></span> live: bought in the last 15 min</div></div>`;
+  const bars = $("raceBars"), now = Date.now() / 1000, nodes = {};
+  const draw = () => {
+    const f = A.race.frames[raceSt.i], mx = Math.max(...f.top.map(v => Math.abs(v.v)), 1);
+    $("raceM").textContent = f.m; $("raceR").value = raceSt.i;
+    const keep = new Set();
+    f.top.slice(0, 12).forEach((v, i) => {
+      const t = byW[v.w] || { handle: v.w.slice(0, 4), platforms: [] }; keep.add(v.w);
+      let n = nodes[v.w];
+      if (!n) { n = document.createElement("div"); n.className = "rbar tap"; n.dataset.trader = v.w; n.innerHTML = `<span class="rb"></span><span class="rl"></span>`; bars.appendChild(n); nodes[v.w] = n;
+        n.onclick = () => { agSel = { t: "trader", id: v.w, from: "race" }; show("agents"); }; }
+      n.style.transform = `translateY(${i * 30}px)`; n.style.opacity = 1;
+      const b = n.querySelector(".rb"); b.style.width = Math.max(2, Math.abs(v.v) / mx * 70) + "%"; b.style.background = v.v < 0 ? "#ff5468" : PLAT_C[t.platforms[0]] || "#888";
+      n.querySelector(".rl").innerHTML = `${platDots(t.platforms)}${esc(t.handle)} <b>${kusd(v.v)}</b>${t.last_buy && now - t.last_buy < 900 ? `<span class="pulse"></span>` : ""}`;
+    });
+    for (const [w, n] of Object.entries(nodes)) if (!keep.has(w)) { n.style.opacity = 0; n.style.transform = `translateY(${12 * 30}px)`; }
+  };
+  draw();
+  $("raceR").oninput = e => { raceSt.i = +e.target.value; draw(); };
+  $("raceBtn").onclick = () => { raceSt.play = !raceSt.play; $("raceBtn").textContent = raceSt.play ? "Pause" : "Play"; };
+  clearInterval(raceSt.timer);
+  raceSt.timer = setInterval(() => { if (view !== "race" || !raceSt.play) return; raceSt.i = (raceSt.i + 1) % A.race.frames.length; draw(); }, 1400);
+}
+setInterval(() => { if (view === "agents" || view === "coin") tickUpd(); }, 1000);
+setInterval(() => { if (view === "coin" && coinSel) fetchHolders(coinSel); }, 30000);
+setInterval(fetchLive, 20000);
+
 function show(v) {
   view = v; localStorage.setItem("desk_view", v);
   document.querySelectorAll(".view").forEach(s => s.classList.toggle("on", s.id === "v-" + v));
   document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.v === v));
-  if (D) ({ home: renderHome, audit: renderAudit, coins: renderCoins, trades: renderTrades, whales: renderWhales, events: renderEvents })[v]();
+  if (D) ({ home: renderHome, audit: renderAudit, coins: renderCoins, trades: renderTrades, whales: renderWhales, events: renderEvents, agents: renderAgents, race: renderRace, coin: renderCoin })[v]();
   window.scrollTo(0, 0);
 }
 document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => show(b.dataset.v));
@@ -560,8 +896,10 @@ async function enableAlerts() {
 
 async function refresh() {
   try {
+    const prev = D && D.agentsx;
     D = await load("desk");
-    renderHeader(); show(view);
+    try { D.agentsx = await load("agents"); } catch (e) { D.agentsx = prev || null; }
+    renderHeader(); if (view === "agents") renderAgents(true); else if (view === "coin") renderCoin(); else if (view !== "race") show(view); fetchLive();
   } catch (e) {
     if (!D) { $("lock").style.display = "block"; $("app").style.display = "none";
       $("lockmsg").textContent = "Cannot open the desk data - wrong or missing token. Open your secret desk link again."; }
@@ -571,7 +909,7 @@ async function refresh() {
 }
 
 if (!deskToken()) { $("lock").style.display = "block"; $("app").style.display = "none"; $("tabs").style.display = "none"; $("upd").textContent = ""; }
-else { registerSW(); show(view); refresh(); setInterval(refresh, 60000); setInterval(() => D && renderHeader(), 30000); }
+else { registerSW(); show(view); refresh(); setInterval(refresh, 30000); setInterval(() => D && renderHeader(), 30000); }
 </script>
 </body>
 </html>
