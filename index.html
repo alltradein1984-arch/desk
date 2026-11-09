@@ -4,9 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="referrer" content="no-referrer">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' https: data:; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' https://api.dexscreener.com https://api.rugcheck.xyz https://api.geckoterminal.com; frame-src https://dexscreener.com; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' https: data:; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' https://api.dexscreener.com https://api.rugcheck.xyz https://api.geckoterminal.com; frame-src https://dexscreener.com https://www.dexscreener.com; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="theme-color" content="#07090c">
 <title>Desk</title>
+<!-- desk-build:17 chart-eager -->
 <script>
 // set the theme before first paint; Dark / Dim / Light (legacy auto/light migrated once)
 (function () { try {
@@ -38,8 +39,12 @@ header .upd{margin-left:auto;color:var(--mut);font-size:.68rem;text-align:right;
 .hdr-coin[hidden]{display:none!important}
 .hdr-btn{font-size:.65rem;font-weight:700;padding:.16rem .4rem;border-radius:8px;border:1px solid var(--line);color:var(--txt);text-decoration:none;background:var(--card2);white-space:nowrap;line-height:1.2}
 .hdr-btn[aria-disabled="true"]{opacity:.35;pointer-events:none}
-.live-chart{margin:0 0 .75rem;border-radius:12px;overflow:hidden;border:1px solid var(--line);background:var(--card2)}
+.live-chart{position:relative;margin:0;border-radius:12px;overflow:hidden;border:1px solid var(--line);background:var(--card2);min-height:340px}
 .live-chart iframe{display:block;width:100%;height:340px;border:0;background:transparent}
+.chart-loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:1;background:var(--card2);color:var(--mut);font-size:.85rem;font-weight:600;pointer-events:none}
+.live-chart.is-ready .chart-loading,.live-chart.is-failed .chart-loading{display:none}
+.chart-fallback{padding:.55rem .7rem;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:.4rem;align-items:center}
+.chart-fallback[hidden]{display:none!important}
 .chart-miss{padding:.7rem .8rem;text-align:center;border:1px dashed var(--line);border-radius:12px;margin:0 0 .75rem}
 .mc-chart-wrap{margin:0 0 .75rem;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--card2)}
 .mc-chart{width:100%;height:320px}
@@ -431,13 +436,55 @@ function coinAlertsHtml(mint, n) {
   }).join("")}</div>`;
 }
 function liveChartHtml(chartUrl, mint) {
-  // DexScreener embed only. Order on card: chart → name header → dex info → MC/alerts → checks.
+  // DexScreener embed. Eager src (no loading=lazy — blank on Android standalone PWA).
+  // referrerpolicy not no-referrer: Dex embed often stays blank without a referrer.
   const addr = embedAddr(chartUrl, mint);
   const th = chartTheme();
-  const chart = addr
-    ? `<div class="live-chart"><iframe src="${esc(`https://dexscreener.com/solana/${addr}?embed=1&theme=${th}&chartTheme=${th}&info=0&trades=0&chartLeftToolbar=0&interval=5`)}" title="Live price chart" loading="lazy" referrerpolicy="no-referrer" allow="clipboard-write"></iframe></div>`
-    : `<div class="chart-miss mut sm">chart unavailable</div>`;
-  return `<div class="mc-chart-wrap" data-mint="${esc(mint || "")}">${chart}</div>`;
+  const open = chartBtn(chartUrl) || (addr ? chartBtn("https://dexscreener.com/solana/" + addr) : "");
+  if (!addr) {
+    return `<div class="mc-chart-wrap" data-mint="${esc(mint || "")}"><div class="chart-miss mut sm">Chart unavailable – Open chart</div>
+      <div class="chart-fallback">${open}</div></div>`;
+  }
+  const src = `https://dexscreener.com/solana/${addr}?embed=1&theme=${th}&chartTheme=${th}&info=0&trades=0&chartLeftToolbar=0&interval=5`;
+  return `<div class="mc-chart-wrap" data-mint="${esc(mint || "")}" data-chart-src="${esc(src)}">
+    <div class="live-chart" data-live-chart>
+      <div class="chart-loading">Loading chart…</div>
+      <iframe title="Live price chart" allow="clipboard-write; fullscreen" referrerpolicy="strict-origin-when-cross-origin"></iframe>
+    </div>
+    <div class="chart-fallback" hidden><span class="sm mut">Chart unavailable –</span>${open || `<a class="btn ghost" href="${esc(src.split("?")[0])}" target="_blank" rel="noopener noreferrer">Open chart</a>`}</div>
+  </div>`;
+}
+function armLiveCharts(root) {
+  const scope = root && root.querySelectorAll ? root : document;
+  scope.querySelectorAll("[data-live-chart]").forEach(box => {
+    if (box.dataset.armed === "1") return;
+    box.dataset.armed = "1";
+    const wrap = box.closest(".mc-chart-wrap");
+    const iframe = box.querySelector("iframe");
+    const fallback = wrap && wrap.querySelector(".chart-fallback");
+    const src = wrap && wrap.getAttribute("data-chart-src");
+    if (!iframe || !src) return;
+    let settled = false;
+    const ok = () => {
+      if (settled) return; settled = true;
+      box.classList.add("is-ready"); box.classList.remove("is-failed");
+      if (fallback) fallback.hidden = true;
+    };
+    const fail = () => {
+      if (settled) return; settled = true;
+      box.classList.add("is-failed"); box.classList.remove("is-ready");
+      iframe.style.display = "none";
+      if (fallback) fallback.hidden = false;
+    };
+    iframe.addEventListener("load", ok, { once: true });
+    iframe.addEventListener("error", fail, { once: true });
+    // Set src immediately + again on next tick (standalone PWA race).
+    const assign = () => { try { iframe.src = src; } catch (e) { fail(); } };
+    assign();
+    setTimeout(assign, 0);
+    setTimeout(assign, 250);
+    setTimeout(() => { if (!settled) fail(); }, 8000);
+  });
 }
 function coinChartMeta(mint) {
   if (!mint) return "";
@@ -728,6 +775,7 @@ function renderAudit() {
   document.querySelectorAll(".dots i").forEach(d => d.onclick = () => { aIdx = +d.dataset.i; renderAudit(); });
   renderSplitTrades();
   renderHeader();
+  armLiveCharts($("acard") || $("auditPane"));
   refreshDexInfo(a.mint);
 }
 function renderSplitTrades() { $("splitTrades").innerHTML = tradesHtml(true); }
@@ -1236,6 +1284,7 @@ function renderCoin() {
   el.querySelectorAll("[data-pick]").forEach(n => n.onclick = () => { coinSel = n.dataset.pick; renderCoin(); fetchHolders(coinSel); fetchLive(); });
   $("coinBack").onclick = () => show(coinFrom && coinFrom !== "coin" ? coinFrom : "agents");
   renderHeader();
+  armLiveCharts($("coinBody") || $("v-coin"));
   refreshDexInfo(m);
 }
 function openCoin(m) { coinFrom = view; coinSel = m; show("coin"); fetchHolders(m); fetchLive(); }
@@ -1408,7 +1457,15 @@ const pushOK = () => "serviceWorker" in navigator && "PushManager" in window && 
 let swReg = null, pushCode = localStorage.getItem("desk_push_code");
 async function registerSW() {
   if (!("serviceWorker" in navigator)) return null;
-  try { swReg = await navigator.serviceWorker.register("sw.js", { scope: "./" }); } catch (e) { console.error(e); }
+  try {
+    swReg = await navigator.serviceWorker.register("sw.js?v=17", { scope: "./" });
+    if (swReg && swReg.update) swReg.update().catch(() => {});
+    // New SW takes control → reload once so the PWA drops a blank half-cached shell.
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (refreshing) return; refreshing = true; location.reload();
+    });
+  } catch (e) { console.error(e); }
   return swReg;
 }
 const b64u = b => btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
