@@ -38,6 +38,9 @@ header .upd{margin-left:auto;color:var(--mut);font-size:.68rem;text-align:right;
 .hdr-coin[hidden]{display:none!important}
 .hdr-btn{font-size:.65rem;font-weight:700;padding:.16rem .4rem;border-radius:8px;border:1px solid var(--line);color:var(--txt);text-decoration:none;background:var(--card2);white-space:nowrap;line-height:1.2}
 .hdr-btn[aria-disabled="true"]{opacity:.35;pointer-events:none}
+.live-chart{margin:0 0 .75rem;border-radius:12px;overflow:hidden;border:1px solid var(--line);background:var(--card2)}
+.live-chart iframe{display:block;width:100%;height:340px;border:0;background:transparent}
+.chart-miss{padding:.7rem .8rem;text-align:center;border:1px dashed var(--line);border-radius:12px;margin:0 0 .75rem}
 .badge{font-size:.7rem;font-weight:700;padding:.15rem .5rem;border-radius:99px;letter-spacing:.06em}
 .b-paper{background:#2a2410;color:var(--amb);border:1px solid #5a4614}.b-live{background:#2a1015;color:var(--red);border:1px solid #5a1a24}
 main{max-width:1280px;margin:0 auto;padding:1rem}
@@ -282,6 +285,13 @@ function applyTheme() {
   if (meta) meta.setAttribute("content", THEME_COLOR[pref] || "#07090c");
   const b = document.getElementById("theme");
   if (b) b.textContent = THEME_LABEL[pref] || "Dark";
+  // Remount the visible live chart so Dark/Dim vs Light theme matches.
+  try {
+    if (typeof D !== "undefined" && D && typeof view !== "undefined") {
+      if (view === "audit" && typeof renderAudit === "function") renderAudit();
+      else if (view === "coin" && typeof renderCoin === "function") renderCoin();
+    }
+  } catch (e) {}
 }
 applyTheme();
 document.getElementById("theme").onclick = () => {
@@ -314,6 +324,23 @@ function fomoBtn(link, ghost) {
 function chartBtn(u) {
   return (typeof u === "string" && /^https:\/\/dexscreener\.com\/[A-Za-z0-9\/]+$/.test(u))
     ? `<a class="btn ghost" href="${esc(u)}" target="_blank" rel="noopener noreferrer">Open chart</a>` : "";
+}
+// Live DexScreener embed: Dark/Dim -> dark chart, Light -> light. Only the visible card mounts an iframe.
+function chartTheme() { return document.documentElement.dataset.theme === "light" ? "light" : "dark"; }
+function embedAddr(chartUrl, mint) {
+  if (typeof chartUrl === "string") {
+    const m = chartUrl.match(/^https:\/\/dexscreener\.com\/solana\/([1-9A-HJ-NP-Za-km-z]{32,44})$/);
+    if (m) return m[1];
+  }
+  if (typeof mint === "string" && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(mint)) return mint;
+  return null;
+}
+function liveChartHtml(chartUrl, mint) {
+  const addr = embedAddr(chartUrl, mint);
+  if (!addr) return `<div class="chart-miss mut sm">chart unavailable</div>`;
+  const th = chartTheme();
+  const src = `https://dexscreener.com/solana/${addr}?embed=1&theme=${th}&chartTheme=${th}&info=0&trades=0&chartLeftToolbar=0&interval=5`;
+  return `<div class="live-chart"><iframe src="${esc(src)}" title="Live price chart" loading="lazy" referrerpolicy="no-referrer" allow="clipboard-write"></iframe></div>`;
 }
 // Holder / wallet-owner links (plain, no referral). Same base58 shape as a Solana mint/wallet.
 function holdersBtns(mint, compact) {
@@ -457,6 +484,7 @@ function renderAudit() {
       <div class="counter"><b class="red">${L.length - nOk}</b><span>Rejected</span></div>
       <div class="counter"><b class="grn">${nOk}</b><span>Cleared</span></div></div>
     <div class="card" id="acard">
+      ${liveChartHtml(a.chart_url, a.mint)}
       <div class="coin">${logo(a)}<div><div style="font-weight:800;font-size:1.15rem">${esc(a.sym || "?")}</div>
         <div class="sm mut">${esc(a.name || "")}</div><div class="sm mut">${esc(shortMint(a.mint))} · Solana · ${ago(a.ts)}</div></div>
         <span class="pill ${ok ? "p-ok" : "p-bad"}">${ok ? "Cleared" : "Rejected"}</span></div>
@@ -901,7 +929,6 @@ function renderCoin() {
   const rcLine = R && (R.score != null || R.risks) ? `RugCheck public report: score ${R.score != null ? R.score + "/100 (lower = safer)" : "unknown"} · mint authority ${R.mintAuth === undefined ? "unknown" : R.mintAuth ? "ACTIVE" : "revoked"} · freeze authority ${R.freezeAuth === undefined ? "unknown" : R.freezeAuth ? "ACTIVE" : "revoked"} · LP locked ${R.lpLocked != null ? R.lpLocked.toFixed(0) + "%" : "unknown"}${(R.risks || []).length ? " · risks: " + R.risks.map(x => x.n + (x.l ? " (" + x.l + ")" : "")).join(", ") : " · no risks listed"}` : (L.rcErr ? "RugCheck: unknown (no report)" : "RugCheck: loading…");
   const chips = list.map(([mm, s]) => `<button class="btn ${mm === m ? "" : "ghost"}" data-pick="${esc(mm)}" style="margin:0 .3rem .3rem 0">${esc(s || (A.coins[mm] || {}).sym || (LIVE[mm] || {}).sym || shortMint(mm))}</button>`).join("");
   const pair = L.pair && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(L.pair) ? L.pair : m;
-  const embed = A.embed_base && /^https:\/\/dexscreener\.com\/[a-z]+\/$/.test(A.embed_base) ? `${A.embed_base}${pair}?embed=1&theme=dark&chartTheme=dark&info=0&trades=0&chartLeftToolbar=0&interval=5` : null;
   const marks = ps.flatMap(p => [{ t: p.opened, p: p.entry, k: "buy" }].concat(p.closed ? [{ t: p.closed, p: p.exit, k: "sell" }] : []));
   const top = (R && R.top) || [], known = (R && R.known) || {}, lpSet = new Set();
   for (const mk of (R && R.markets) || []) [mk.pubkey, mk.liquidityA, mk.liquidityB, (mk.liquidityAAccount || {}).owner].forEach(x => x && lpSet.add(x));
@@ -916,8 +943,10 @@ function renderCoin() {
     return out; };
   const sup = R && R.supply ? R.supply / 10 ** (R.decimals || 0) : null;
   const devPct = R && R.creatorBalance != null && sup ? R.creatorBalance / 10 ** (R.decimals || 0) / sup * 100 : (c.dev_pct != null ? +c.dev_pct : null);
+  const chartUrl = (ps[0] || {}).chart_url || (c.link && null) || (pair ? ("https://dexscreener.com/solana/" + pair) : null);
   el.innerHTML = `<div class="card agcard"><div class="row"><button class="btn ghost" id="coinBack">← Back</button><span class="sp"></span><span class="badge b-paper">PAPER</span></div>
     <div style="margin-top:.6rem">${chips}</div>
+    ${liveChartHtml(chartUrl, m)}
     <h2 style="margin:.4rem 0 .1rem">${esc(c.sym || L.sym || (R && R.sym) || shortMint(m))}</h2>${isPasted ? `<span class="stage">pasted · not tracked by the desk</span>` : ""}<div class="sm mut" style="word-break:break-all"><code>${esc(m)}</code></div>
     <div class="sm mut" id="coinUpd">price ${L.ts ? agoS(L.ts) : "loading…"} · holders ${L.rcTs ? agoS(L.rcTs) : "loading…"}</div>
     <div class="kv3" style="margin-top:.6rem"><div><b>${L.price ? px(L.price) : "–"}</b><span class="mut sm">price (live)</span></div>
@@ -932,8 +961,8 @@ function renderCoin() {
     <div class="sm" style="margin-top:.3rem">${c.rug ? `Desk rug check: ${esc(c.rug.text)} · <span class="mut">${esc(c.rug.why || "")}</span>` : "Desk rug check: not run on this coin."}</div>
     <div class="sm${R && (R.mintAuth || R.freezeAuth || L.rugged) ? " red" : ""}">${esc(rcLine)}</div>
     <div class="row" style="margin-top:.6rem;gap:.5rem;flex-wrap:wrap">${fomoBtn(flink)}${holdersBtns(m)}</div></div>
-  <div class="card agcard"><b>Live chart</b>${embed ? `<iframe src="${esc(embed)}" title="chart" style="width:100%;height:360px;border:0;border-radius:10px;margin-top:.5rem" loading="lazy" referrerpolicy="no-referrer"></iframe>` : ""}
-    <div class="sm mut" style="margin-top:.4rem">PAPER entry / exit on the desk's own price samples:</div>${priceSvg(c.series, marks)}</div>
+  <div class="card agcard"><b>PAPER entry / exit</b>
+    <div class="sm mut" style="margin-top:.4rem">Desk's own price samples (not DexScreener):</div>${priceSvg(c.series, marks)}</div>
   <div class="card agcard"><b>Top holders</b>${top.length ? top.slice(0, 20).map((h, i) => { const lb = labels(h);
     return `<div class="row sm" style="margin-top:.3rem;flex-wrap:wrap;gap:.2rem"><span class="mut" style="width:1.4rem">${i + 1}</span>${walletLink(h.owner)}${lb.map(x => `<span class="stage" style="margin-left:.25rem">${esc(x)}</span>`).join("")}<span class="sp"></span><b>${(h.pct || 0).toFixed(2)}%</b></div>`; }).join("")
     : `<p class="sm mut">${L.rcTs ? "Top holders: unknown (RugCheck gave no list)." : "Loading from RugCheck…"}</p>`}</div>
