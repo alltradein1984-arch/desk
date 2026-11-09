@@ -125,6 +125,8 @@ html[data-theme="light"] .btn{color:#fff}html[data-theme="light"] .btn.ghost{col
 .agbig{font-size:2rem;font-weight:800;letter-spacing:-.02em;margin:.2rem 0}
 .agsplit{display:grid;grid-template-columns:1fr;gap:0}@media(min-width:720px){.agsplit{grid-template-columns:1fr 1fr;gap:.9rem}}
 .kv3{display:grid;grid-template-columns:repeat(3,1fr);gap:.4rem;margin:.6rem 0}.kv3>div{display:flex;flex-direction:column;background:var(--card2);border-radius:10px;padding:.45rem .5rem}
+.pnlg{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}.pnlc{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:.8rem}.pnlc .agbig{font-size:1.9rem}
+.hbg{display:grid;grid-template-columns:repeat(2,1fr);gap:.25rem .8rem;margin-top:.4rem}
 .agscroll{display:flex;gap:.6rem;overflow-x:auto;padding:.5rem 0 .2rem;scroll-snap-type:x mandatory}
 .agc{flex:0 0 230px;scroll-snap-align:start;background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:.7rem}
 .agdot{width:9px;height:9px;border-radius:50%;background:#ff5468;margin-right:.4rem;display:inline-block}.agdot.on{background:#2fd27a;box-shadow:0 0 0 0 rgba(47,210,122,.6);animation:pl 1.6s infinite}
@@ -562,7 +564,10 @@ async function fetchHolders(m) {
     const tk = j.token || {};
     LIVE[m] = Object.assign(LIVE[m] || {}, { holders: Number.isFinite(j.totalHolders) ? j.totalHolders : null, rugged: !!j.rugged, rcTs: Date.now() / 1000,
       rc: { total: Number.isFinite(j.totalHolders) ? j.totalHolders : null, top, top10: top.length ? top10 : null, markets: j.markets || [], known: j.knownAccounts || {},
-            nets: j.insiderNetworks || [], creator: j.creator, creatorBalance: j.creatorBalance, supply: tk.supply, decimals: tk.decimals } });
+            nets: j.insiderNetworks || [], creator: j.creator, creatorBalance: j.creatorBalance, supply: tk.supply, decimals: tk.decimals,
+            score: Number.isFinite(j.score_normalised) ? j.score_normalised : null, risks: (j.risks || []).map(r => ({ n: r.name, l: r.level })).slice(0, 8),
+            mintAuth: j.mintAuthority === undefined ? undefined : j.mintAuthority, freezeAuth: j.freezeAuthority === undefined ? undefined : j.freezeAuthority,
+            lpLocked: (j.markets || []).reduce((a, mk) => Math.max(a, ((mk.lp || {}).lpLockedPct) || 0), 0) || null, sym: tk.symbol || (j.tokenMeta || {}).symbol || null } });
   } catch (e) { LIVE[m] = Object.assign(LIVE[m] || {}, { rcErr: true, rcTs: Date.now() / 1000 }); }
   if (view === "coin" && coinSel === m) renderCoin();
 }
@@ -644,6 +649,14 @@ function traderView(t) {
 }
 const BURN = new Set(["1nc1nerator11111111111111111111111111111111", "11111111111111111111111111111111"]);
 let coinSel = null, coinFrom = "agents";
+let pasted = (() => { try { return JSON.parse(localStorage.getItem("desk_pasted") || "[]").filter(validCA).slice(0, 6); } catch (e) { return []; } })();
+function pasteMint(raw) {
+  const m = String(raw ?? "").trim(), msg = $("pasteMsg");
+  if (!validCA(m)) { if (msg) { msg.textContent = "Not a valid Solana mint address (base58, 32-44 characters, 32 bytes)."; msg.className = "sm red"; } return false; }
+  pasted = [m].concat(pasted.filter(x => x !== m)).slice(0, 6); localStorage.setItem("desk_pasted", JSON.stringify(pasted));
+  if (msg) { msg.textContent = "Loading live data…"; msg.className = "sm mut"; }
+  coinSel = m; renderCoin(); fetchHolders(m); fetchLive(); return true;
+}
 function realHolders(R, A) {
   // RugCheck report = the same source as the desk's bubble-map (insider network) check in agents/auditor.py
   if (!R || R.total == null) return null;
@@ -657,9 +670,9 @@ function realHolders(R, A) {
   }
   const nets = (R.nets || []).filter(n => (n.size || 0) >= (A.bundle_min || 3) && (n.currentHolding || 0) > 0);
   const linked = nets.reduce((s, n) => s + (n.activeAccounts || n.size || 0), 0);
-  const sup = R.supply && R.decimals != null ? R.supply / 10 ** R.decimals : R.supply;
-  const held = nets.reduce((s, n) => s + (n.currentHolding || n.tokenAmount || 0), 0);
-  const heldPct = sup && held ? held / (R.supplyRaw ? R.supplyRaw : sup) * 100 : null;
+  // RugCheck insiderNetworks currentHolding and token.supply are both in raw (smallest) units
+  const held = nets.reduce((s, n) => s + (n.currentHolding ?? 0), 0);
+  const heldPct = R.supply && held ? Math.min(100, held / R.supply * 100) : null;
   const real = Math.max(0, R.total - lp - burn - Math.max(0, linked - nets.length));
   return { total: R.total, real, lp, burn, linked, clusters: nets.length, heldPct };
 }
@@ -673,18 +686,34 @@ function priceSvg(series, marks) {
   return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:${H}px"><polyline points="${line}" fill="none" stroke="#5aa9ff" stroke-width="1.6"/>${mk}</svg>`;
 }
 function coinList(A) {
-  return [...new Map(A.open.concat(A.closed).map(p => [p.mint, p.sym])).entries()].concat(A.alerts.filter(a => isMint(a.mint)).map(a => [a.mint, null]))
+  return pasted.map(m => [m, null]).concat([...new Map(A.open.concat(A.closed).map(p => [p.mint, p.sym])).entries()].concat(A.alerts.filter(a => isMint(a.mint)).map(a => [a.mint, null])))
     .filter((x, i, arr) => arr.findIndex(y => y[0] === x[0]) === i).slice(0, 14);
 }
 function renderCoin() {
-  const el = $("v-coin"), A = D && D.agentsx;
-  if (!A) { el.innerHTML = `<div class="card mut">Coin data not in this feed yet.</div>`; return; }
+  const root = $("v-coin"), A = D && D.agentsx;
+  if (!A) { root.innerHTML = `<div class="card mut">Coin data not in this feed yet.</div>`; return; }
+  if (!$("coinBody")) {
+    root.innerHTML = `<div class="card agcard"><b>Paste a mint</b><div class="sm mut">Any Solana coin: live chart, holders, bubble map and rug check from the same public APIs. Read-only, no buy button.</div>
+      <div class="row" style="gap:.4rem;margin-top:.5rem"><input id="pasteIn" placeholder="Solana mint address" autocomplete="off" spellcheck="false" style="flex:1;min-width:0"><button class="btn" id="pasteGo">Show</button></div>
+      <div class="sm mut" id="pasteMsg"></div></div><div id="coinBody"></div>`;
+    $("pasteGo").onclick = () => pasteMint($("pasteIn").value);
+    $("pasteIn").onkeydown = e => { if (e.key === "Enter") pasteMint(e.target.value); };
+    $("pasteIn").onpaste = e => setTimeout(() => pasteMint(e.target.value), 0);
+  }
+  const el = $("coinBody");
   const list = coinList(A); const m = coinSel || (list[0] || [])[0];
-  if (!m) { el.innerHTML = `<div class="card agcard">No open PAPER positions or alert coins yet.</div>`; return; }
+  if (!m) { el.innerHTML = `<div class="card agcard">No open PAPER positions or alert coins yet. Paste a mint above.</div>`; return; }
   coinSel = m;
   if (!LIVE[m] || !LIVE[m].rcTs) fetchHolders(m);
   const c = (A.coins || {})[m] || {}, L = LIVE[m] || {}, R = L.rc, ps = A.open.concat(A.closed).filter(p => p.mint === m);
   const rh = realHolders(R, A), F = A.followed || {};
+  const isPasted = pasted.includes(m) && !(A.coins || {})[m], pm = $("pasteMsg");
+  if (pm && pasted[0] === m) { pm.textContent = L.rcErr && !L.ts ? "No data from RugCheck or DexScreener for this mint (yet) - everything shows unknown." : L.rcTs || L.ts ? "" : "Loading live data…"; pm.className = "sm mut"; }
+  const fh = (c.followed_holders || []).map(h => ({ rank: h.rank, handle: h.handle, usd: h.usd, src: "trades" }));
+  for (const x of (A.fh || {})[m] || []) if (!fh.some(h => h.handle === x[1])) fh.push({ rank: x[0], handle: x[1], usd: x[2], src: "trades" });
+  for (const h of (R && R.top) || []) { const f = F[h.owner]; if (f && !fh.some(x => x.handle === f.h)) fh.push({ rank: f.r, handle: f.h, pct: h.pct, src: "top holders" }); }
+  const flink = c.link || (ps[0] || {}).link || (A.fomo_tpl && validCA(m) ? A.fomo_tpl.replace("MINTADDR", m) : null);
+  const rcLine = R && (R.score != null || R.risks) ? `RugCheck public report: score ${R.score != null ? R.score + "/100 (lower = safer)" : "unknown"} · mint authority ${R.mintAuth === undefined ? "unknown" : R.mintAuth ? "ACTIVE" : "revoked"} · freeze authority ${R.freezeAuth === undefined ? "unknown" : R.freezeAuth ? "ACTIVE" : "revoked"} · LP locked ${R.lpLocked != null ? R.lpLocked.toFixed(0) + "%" : "unknown"}${(R.risks || []).length ? " · risks: " + R.risks.map(x => x.n + (x.l ? " (" + x.l + ")" : "")).join(", ") : " · no risks listed"}` : (L.rcErr ? "RugCheck: unknown (no report)" : "RugCheck: loading…");
   const chips = list.map(([mm, s]) => `<button class="btn ${mm === m ? "" : "ghost"}" data-pick="${esc(mm)}" style="margin:0 .3rem .3rem 0">${esc(s || (A.coins[mm] || {}).sym || (LIVE[mm] || {}).sym || shortMint(mm))}</button>`).join("");
   const pair = L.pair && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(L.pair) ? L.pair : m;
   const embed = A.embed_base && /^https:\/\/dexscreener\.com\/[a-z]+\/$/.test(A.embed_base) ? `${A.embed_base}${pair}?embed=1&theme=dark&chartTheme=dark&info=0&trades=0&chartLeftToolbar=0&interval=5` : null;
@@ -704,7 +733,7 @@ function renderCoin() {
   const devPct = R && R.creatorBalance != null && sup ? R.creatorBalance / 10 ** (R.decimals || 0) / sup * 100 : (c.dev_pct != null ? +c.dev_pct : null);
   el.innerHTML = `<div class="card agcard"><div class="row"><button class="btn ghost" id="coinBack">← Back</button><span class="sp"></span><span class="badge b-paper">PAPER</span></div>
     <div style="margin-top:.6rem">${chips}</div>
-    <h2 style="margin:.4rem 0 .1rem">${esc(c.sym || L.sym || shortMint(m))}</h2><div class="sm mut" style="word-break:break-all"><code>${esc(m)}</code></div>
+    <h2 style="margin:.4rem 0 .1rem">${esc(c.sym || L.sym || (R && R.sym) || shortMint(m))}</h2>${isPasted ? `<span class="stage">pasted · not tracked by the desk</span>` : ""}<div class="sm mut" style="word-break:break-all"><code>${esc(m)}</code></div>
     <div class="sm mut" id="coinUpd">price ${L.ts ? agoS(L.ts) : "loading…"} · holders ${L.rcTs ? agoS(L.rcTs) : "loading…"}</div>
     <div class="kv3" style="margin-top:.6rem"><div><b>${L.price ? px(L.price) : "–"}</b><span class="mut sm">price (live)</span></div>
       <div><b>${L.mcap ? kusd(L.mcap) : "–"}</b><span class="mut sm">market cap</span></div><div><b>${L.liq ? kusd(L.liq) : c.liq ? kusd(c.liq) : "–"}</b><span class="mut sm">liquidity</span></div>
@@ -715,14 +744,15 @@ function renderCoin() {
     ${rh ? `<div class="sm mut">Real = total minus ${rh.lp} LP/pool/curve account(s), ${rh.burn} burn address(es) and ${Math.max(0, rh.linked - rh.clusters)} linked wallets (${rh.linked} wallets in ${rh.clusters} cluster(s), each cluster counted once). Dust wallets (&lt;$1) are NOT excluded - RugCheck has no full holder list - so the real number is lower.</div>` : ""}
     <div class="sm" style="margin-top:.4rem"><b>Bubble map (linked wallets):</b> ${rh ? `${rh.clusters} cluster(s), ${rh.linked} linked wallets${rh.heldPct != null ? `, ${rh.heldPct.toFixed(1)}% of supply` : ", % held unknown"}` : c.bundled != null ? `${esc(c.bundled)} linked wallets (desk rug check)` : "unknown"} · desk check: ${c.bundled != null ? esc(c.bundled) + " linked still holding" : "not run"}</div>
     <div class="sm">Dev sold: ${c.dev_sold_pct != null ? esc((+c.dev_sold_pct).toFixed(0)) + "% of his launch bag" : "unknown"}${L.rugged ? ` · <b class="red">RugCheck marks it RUGGED</b>` : ""}</div>
-    <div class="sm" style="margin-top:.3rem">${c.rug ? `${esc(c.rug.text)} · <span class="mut">${esc(c.rug.why || "")}</span>` : "No desk rug check on file."}</div>
-    <div class="row" style="margin-top:.6rem;gap:.5rem">${fomoBtn(c.link || (ps[0] || {}).link)}${safeUrl(c.bubblemaps) ? `<a class="btn ghost" href="${esc(c.bubblemaps)}" target="_blank" rel="noopener noreferrer">Bubblemaps</a>` : ""}</div></div>
+    <div class="sm" style="margin-top:.3rem">${c.rug ? `Desk rug check: ${esc(c.rug.text)} · <span class="mut">${esc(c.rug.why || "")}</span>` : "Desk rug check: not run on this coin."}</div>
+    <div class="sm${R && (R.mintAuth || R.freezeAuth || L.rugged) ? " red" : ""}">${esc(rcLine)}</div>
+    <div class="row" style="margin-top:.6rem;gap:.5rem">${fomoBtn(flink)}<a class="btn ghost" href="${esc(c.bubblemaps || "https://app.bubblemaps.io/sol/token/" + m)}" target="_blank" rel="noopener noreferrer">Bubblemaps</a></div></div>
   <div class="card agcard"><b>Live chart</b>${embed ? `<iframe src="${esc(embed)}" title="chart" style="width:100%;height:360px;border:0;border-radius:10px;margin-top:.5rem" loading="lazy" referrerpolicy="no-referrer"></iframe>` : ""}
     <div class="sm mut" style="margin-top:.4rem">PAPER entry / exit on the desk's own price samples:</div>${priceSvg(c.series, marks)}</div>
   <div class="card agcard"><b>Top holders</b>${top.length ? top.slice(0, 20).map((h, i) => { const lb = labels(h);
     return `<div class="row sm" style="margin-top:.3rem"><span class="mut" style="width:1.4rem">${i + 1}</span><code>${esc(shortMint(h.owner))}</code>${lb.map(x => `<span class="stage" style="margin-left:.25rem">${esc(x)}</span>`).join("")}<span class="sp"></span><b>${(h.pct || 0).toFixed(2)}%</b></div>`; }).join("")
     : `<p class="sm mut">${L.rcTs ? "Top holders: unknown (RugCheck gave no list)." : "Loading from RugCheck…"}</p>`}</div>
-  <div class="card agcard"><b>Followed traders holding it</b>${(c.followed_holders || []).map(h => `<div class="row sm" style="margin-top:.3rem"><b>#${h.rank} ${esc(h.handle)}</b><span class="sp"></span>bought $${(h.usd || 0).toLocaleString()}</div>`).join("") || `<p class="sm mut">None of the followed wallets holds it (by the trades the poller saw).</p>`}</div>
+  <div class="card agcard"><b>Followed traders holding it</b>${fh.map(h => `<div class="row sm" style="margin-top:.3rem"><b>#${h.rank} ${esc(h.handle)}</b><span class="sp"></span>${h.pct != null ? (+h.pct).toFixed(2) + "% (top holder)" : "bought $" + (h.usd || 0).toLocaleString()}</div>`).join("") || `<p class="sm mut">None seen: no followed wallet among the top holders or in the last 72 h of followed trades.</p>`}</div>
   <div class="card agcard"><b>PAPER position</b>${ps.map(p => { const lp = p.closed ? { pnl: p.pnl } : livePnl(p);
     return `<div class="item"><div class="row"><span class="stage">${p.book === "auto" ? "auto · " + esc(p.tier) : p.book === "manual" ? "yours (logged)" : "desk"}</span><span class="sp"></span><b class="${cls(lp.pnl)}">${usd(lp.pnl, 1)}</b></div>
     <div class="sm mut">PAPER $${p.size} · entry ${px(p.entry)} · ${p.closed ? "closed " + tm(p.closed) + " · " + esc(p.reason || "") : "open since " + tm(p.opened)}</div></div>`; }).join("") || `<p class="sm mut">No PAPER position in this coin.</p>`}</div>`;
@@ -730,6 +760,51 @@ function renderCoin() {
   $("coinBack").onclick = () => show(coinFrom && coinFrom !== "coin" ? coinFrom : "agents");
 }
 function openCoin(m) { coinFrom = view; coinSel = m; show("coin"); fetchHolders(m); fetchLive(); }
+function pnlCards(A) {
+  const P = A.pnl; if (!P) return "";
+  const cb = A.coin_bot, upnl = A.open.reduce((s, p) => s + (livePnl(p).pnl || 0), 0), ctot = cb.realized + upnl;
+  const cd = P.coin.days ? ctot / P.coin.days : null, T = P.trader, tot = ctot + (T ? T.total : 0), dly = (cd || 0) + (T ? T.daily : 0);
+  const split = (c, t) => `<div class="sm" style="margin-top:.3rem">🪙 Coin bot <b class="${cls(c)}">${usd(c, 2)}</b></div><div class="sm">📈 Trader bot <b class="${cls(t)}">${T ? usd(t, 2) : "–"}</b></div>`;
+  return `<div class="pnlg" style="margin-bottom:.9rem"><div class="pnlc"><div class="row"><span class="mut sm">Total PnL</span><span class="sp"></span><span class="badge b-paper">PAPER</span></div>
+      <div class="agbig ${cls(tot)}">${usd(tot, 2)}</div>${split(ctot, T && T.total)}</div>
+    <div class="pnlc"><div class="row"><span class="mut sm">Daily average PnL</span><span class="sp"></span><span class="badge b-paper">PAPER</span></div>
+      <div class="agbig ${cls(dly)}">${usd(dly, 2)}</div>${split(cd, T && T.daily)}</div></div>
+    <div class="sm mut" style="margin:-.5rem 0 .9rem">Coin bot: live PAPER over ${P.coin.days ?? "–"} day(s) (closed + live open P&amp;L) · Trader bot: ${esc(T ? T.basis : "no data")} (${T ? T.days : "–"} days). Simulated money only.</div>`;
+}
+function engineCard(A) {
+  const E = A.engine; if (!E) return "";
+  const h1 = E.per_hour_1h, h24 = E.per_hour_24h, up = E.uptime_24h, ok = E.online === E.total;
+  const lr = E.last_restart;
+  return `<div class="card agcard"><div class="row"><span class="agdot ${ok ? "on" : ""}"></span><b>Engine ${E.online > 0 ? "is running" : "stopped"}</b><span class="sp"></span><span class="badge b-paper">PAPER</span></div>
+    <div class="kv3"><div><b>${up.pct}%</b><span class="mut sm">uptime 24 h</span></div><div><b>${E.online}/${E.total}</b><span class="mut sm">agents online</span></div>
+      <div><b>${lr ? tm(lr.ts) : "–"}</b><span class="mut sm">last restart${lr && lr.pid ? " · pid " + lr.pid : ""}</span></div></div>
+    <table class="agt"><tr class="mut"><td>per hour</td><td>last 1 h</td><td>24 h avg</td></tr>
+      <tr><td>coins scanned</td><td>${h1.coins}</td><td>${h24.coins}</td></tr><tr><td>alerts</td><td>${h1.alerts}</td><td>${h24.alerts}</td></tr>
+      <tr><td>PAPER trades</td><td>${h1.paper_trades}</td><td>${h24.paper_trades}</td></tr><tr><td>followed trades seen</td><td>${h1.followed_trades}</td><td>${h24.followed_trades}</td></tr></table>
+    <div class="sm mut" style="margin-top:.4rem">Uptime 7 d ${E.uptime_7d.pct}% · ${E.restarts_24h} restart(s) and ${E.pauses_24h} box pause(s) (~${E.paused_min_24h} min) in 24 h. Uptime = 5-min slots in which the desk wrote data.</div>
+    <div class="sm" style="margin-top:.5rem"><b>Heartbeats</b> <span class="mut">(age when this data was built)</span></div>
+    <div class="hbg">${E.beats.map(b => `<div class="row sm"><span class="agdot ${b.online ? "on" : ""}"></span>${esc(b.name)}<span class="sp"></span><span class="${b.online ? "mut" : "red"}">${b.age == null ? "none" : b.age < 90 ? b.age + " s" : Math.round(b.age / 60) + " min"}</span></div>`).join("")}</div></div>`;
+}
+function bookSvg(B) {
+  if (!B || B.actual.length < 3) return `<p class="sm mut">Needs at least 2 closed trades.</p>`;
+  const W = 340, H = 170, all = B.sims.flat().concat(B.actual), n = B.actual.length - 1;
+  const y0 = Math.min(0, ...all), y1 = Math.max(0, ...all), X = i => 4 + i / n * (W - 8), Y = v => H - 6 - (v - y0) / ((y1 - y0) || 1) * (H - 12);
+  const pl = c => c.map((v, i) => `${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(" ");
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:${H}px"><line x1="0" x2="${W}" y1="${Y(0)}" y2="${Y(0)}" stroke="#8a94a6" stroke-dasharray="3 3" stroke-width=".8"/>
+    ${B.sims.map(c => `<polyline points="${pl(c)}" fill="none" stroke="#8a94a6" stroke-opacity=".28" stroke-width="1"/>`).join("")}
+    <polyline points="${pl(B.actual)}" fill="none" stroke="#ffb020" stroke-width="2.6"/><circle cx="${X(n)}" cy="${Y(B.actual[n])}" r="4" fill="#ffb020"/></svg>`;
+}
+function bookCard(A) {
+  const B = A.book; if (!B) return "";
+  const r = v => v == null ? "–" : v;
+  return `<div class="card agcard"><div class="row"><b>📚 Strategy book · auto PAPER copy-trading</b><span class="sp"></span><span class="badge b-paper">SIMULATION</span></div>
+    <p class="sm amb" style="margin:.3rem 0">${esc(B.note)}</p>${bookSvg(B)}
+    <div class="sm mut"><span style="color:#ffb020">━</span> actual (trades in time order) · <span style="color:#8a94a6">━</span> ${B.paths} Monte Carlo resamples of the same trades · dashed = $0</div>
+    <div class="kv3"><div><b>${B.n}</b><span class="mut sm">trades</span></div><div><b>${B.win_rate != null ? Math.round(B.win_rate * 100) + "%" : "–"}</b><span class="mut sm">win rate</span></div>
+      <div><b>${r(B.profit_factor)}</b><span class="mut sm">profit factor</span></div><div><b>${r(B.sharpe_like)}</b><span class="mut sm">Sharpe-like (avg / sd per trade)</span></div>
+      <div><b class="${cls(B.total)}">${usd(B.total, 2)}</b><span class="mut sm">total P&amp;L</span></div><div><b>${usd(-(B.max_dd || 0), 2)}</b><span class="mut sm">max drawdown</span></div></div>
+    <div class="sm mut">Resampled end result: 5% ${usd(B.p5, 2)} · median ${usd(B.p50, 2)} · 95% ${usd(B.p95, 2)} · ${B.p_loss != null ? Math.round(B.p_loss * 100) + "% of paths end below $0" : ""}</div></div>`;
+}
 function renderAgents(keep) {
   const el = $("v-agents"), A = D.agentsx;
   if (!A) { el.innerHTML = `<div class="card mut">Agents data not in this feed yet.</div>`; return; }
@@ -739,11 +814,12 @@ function renderAgents(keep) {
     const cb = A.coin_bot, tb = A.trader_bot, upnl = A.open.reduce((s, p) => s + (livePnl(p).pnl || 0), 0);
     const cbBal = cb.start + cb.realized + upnl, tot = cbBal + ((tb || {}).balance || 0), st = A.combined.start;
     const au = A.auto, wins = A.closed.filter(c => (c.pnl || 0) > 0).length;
-    el.innerHTML = `<div class="card agcard"><div class="row"><span class="badge b-paper">PAPER</span><span class="sp"></span><span class="sm mut" id="agUpd"></span></div>
+    el.innerHTML = `${pnlCards(A)}<div class="card agcard"><div class="row"><span class="badge b-paper">PAPER</span><span class="sp"></span><span class="sm mut" id="agUpd"></span></div>
       <div class="mut sm" style="margin-top:.5rem">Combined PAPER balance · Coin bot + Trader bot</div>
       <div class="agbig" style="font-size:2.6rem">${usd(tot)}</div>
       <div class="sm ${cls(tot - st)}">${usd(tot - st, 1)} (${pct((tot / st - 1) * 100)}) on $${st}</div><div class="sm mut">${esc(A.combined.note)}</div>
       ${curveSvg(cb.curve.slice(0, -1).concat([[Math.round(Date.now() / 1000), cbBal]]))}<div class="sm mut">Coin bot PAPER equity curve (closed trades + live open P&amp;L)</div></div>
+    ${engineCard(A)}
     <div class="agsplit">${botCard(cb, "coin")}${botCard(tb, "trader")}</div>
     <div class="card agcard"><div class="row"><b>Agents</b><span class="sp"></span><span class="sm grn">${A.agents.filter(a => (hbAge(a.id) ?? 1e9) < 120).length} running</span></div>
       <div class="agscroll">${A.agents.map(agentCard).join("")}</div></div>
@@ -756,6 +832,7 @@ function renderAgents(keep) {
     <div class="card agcard"><div class="row"><b>Closed PAPER trades</b><span class="sp"></span><span class="sm">win ${A.closed.length ? Math.round(wins / A.closed.length * 100) + "%" : "–"} of ${A.closed.length}</span></div>
       ${A.closed.map(p => `<div class="item tap" data-coin="${esc(p.mint)}"><div class="row"><b>${esc(p.sym || shortMint(p.mint))}</b><span class="stage">${p.book === "auto" ? "auto · " + esc(p.tier) : p.book === "manual" ? "yours (logged)" : "desk"}</span><span class="sp"></span><b class="${cls(p.pnl)}">${usd(p.pnl, 1)}</b></div>
         <div class="sm mut">PAPER $${p.size} · ${esc(p.reason || "")} · ${tm(p.closed)}</div></div>`).join("") || `<p class="sm mut">No closed PAPER trades yet.</p>`}</div>
+    ${bookCard(A)}
     <div class="card agcard"><div class="row"><b>🧪 Auto PAPER by tier</b><span class="sp"></span><span class="stage">${au.enabled ? "auto on" : "auto off"}</span></div>
       <table class="agt"><tr class="mut"><td>Tier</td><td>Size</td><td>Trades</td><td>Open</td><td>Win</td><td>P&amp;L</td></tr>${au.tiers.map(b => `<tr><td>${esc(b.tier)}</td><td>$${au.rules.sizes[b.tier]}</td><td>${b.trades}</td><td>${b.open}</td><td>${b.win_rate != null ? Math.round(b.win_rate * 100) + "%" : "–"}</td><td class="${cls(b.pnl)}">${usd(b.pnl, 1)}</td></tr>`).join("")}</table>
       <p class="sm mut">Simulated with slippage + FOMO fees. Sells ${au.rules.tp_sell_pct}% at +${au.rules.tp_pct}%, trails the rest ${au.rules.trail_pct}%, stop -${au.rules.stop_pct}%, rug exit at liquidity -${au.rules.liq_drop_pct}%, max ${au.rules.max_hold_h} h, ${au.rules.max_per_day}/day.</p></div>
