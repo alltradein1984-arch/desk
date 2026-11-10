@@ -444,7 +444,7 @@ body.pin-on .chrome-edge{display:none}
     <button type="button" data-k="del" aria-label="Delete">⌫</button>
   </div>
   <button type="button" class="pin-forgot" id="pinForgot">Forgot PIN — use Telegram code</button>
-  <button type="button" class="pin-forgot" id="pinFallback" style="display:none">Fallback: clear PIN + token (need #t= link)</button>
+  <button type="button" class="pin-forgot" id="pinFallback" hidden style="display:none" style="display:none">Fallback: clear PIN + token (need #t= link)</button>
   <p class="pin-note">PIN stays on this device as a salted hash. Not a server password. Reset uses a one-time code from your desk Telegram bot (salted hash in the encrypted feed). Fallback clears the local token and needs your private #t= link.</p>
 </div>
 <div id="chartPark" aria-hidden="true"></div>
@@ -2795,7 +2795,7 @@ function pinFallbackClear() {
     if (pinBuf.length === PIN_LEN) pinSubmit();
   });
   const fg = $("pinForgot"); if (fg) fg.onclick = pinForgot;
-  const fb = $("pinFallback"); if (fb) fb.onclick = pinFallbackClear;
+  const fb = $("pinFallback"); if (fb) fb.remove();
 })();
 
 
@@ -2847,7 +2847,7 @@ function pairPaintRemaining() {
   if (fg) fg.style.transform = "scaleX(" + (left / PAIR_TTL_MS) + ")";
   if ($("pairHint")) {
     $("pairHint").textContent = left > 0
-      ? ("Waiting for /pair… " + pairFmtLeft(left) + " left. You can switch to Telegram — reopen this window after.")
+      ? ("After Paired ✅ the key takes up to 2 min to arrive. Keep this window open. Checking every 3 s · " + pairFmtLeft(left) + " left on this code.")
       : "Code expired. Tap Get key via Telegram again.";
   }
 }
