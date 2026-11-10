@@ -2884,14 +2884,8 @@ async function pairPollOnce() {
     try {
       obj = await pairTryDecrypt(env, pend.code);
     } catch (e) {
-      pend.fails = (pend.fails || 0) + 1;
-      pairSavePending(pend);
-      if (pend.fails >= PAIR_MAX_FAILS) {
-        pairStop(); pairClearPending(); pairShowPanel(false);
-        if ($("pairErr")) $("pairErr").textContent = "Too many failed unlocks. Tap Get key and send a new /pair CODE.";
-      } else if ($("pairErr")) {
-        $("pairErr").textContent = "Waiting for a matching /pair… (" + pend.fails + "/" + PAIR_MAX_FAILS + ")";
-      }
+      // Envelope is for an older/different code: not a failure, just keep waiting.
+      if ($("pairErr")) $("pairErr").textContent = "";
       return;
     }
     if (!obj || !obj.token) return;
