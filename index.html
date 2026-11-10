@@ -7,7 +7,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' https: data:; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' https://api.dexscreener.com https://api.rugcheck.xyz https://api.geckoterminal.com; frame-src https://dexscreener.com https://www.dexscreener.com; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="theme-color" content="#07090c">
 <title>Desk</title>
-<!-- desk-build:27 agent-anim-pin-lock -->
+<!-- desk-build:28 agent-anim-pin-countdown-lockmsg -->
 <script>
 // set the theme before first paint; Dark / Dim / Light (legacy auto/light migrated once)
 (function () { try {
@@ -241,8 +241,16 @@ html[data-theme="light"] .rl{text-shadow:none;color:#0b1220}
 #pinGate .pin-forgot{background:none;border:0;color:var(--mut);text-decoration:underline;font-size:.85rem;cursor:pointer;padding:.4rem}
 #pinGate .pin-note{color:var(--mut);font-size:.72rem;margin-top:1.2rem;line-height:1.35}
 
-#pinGate .pin-pad.pin-locked button:not([data-k="forgot"]){opacity:.45;pointer-events:none}
-#pinGate .pin-err.pin-countdown,#pinGate .pin-err{font-variant-numeric:tabular-nums}
+
+.pin-lockout{display:flex;flex-direction:column;align-items:center;gap:.35rem;margin:.4rem 0 1rem;position:relative}
+.pin-lockout[hidden]{display:none !important}
+.pin-ring{width:120px;height:120px}
+.pin-ring-bg{stroke:var(--line)}
+.pin-ring-fg{stroke:var(--red);stroke-dasharray:326.73;stroke-dashoffset:0;transition:stroke-dashoffset .2s linear}
+.pin-lockout-time{position:absolute;top:38px;font-size:1.85rem;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:.02em}
+.pin-lockout-msg{margin:.15rem 0 0;color:var(--red);font-size:.92rem;font-weight:600;text-align:center;max-width:16rem;line-height:1.3}
+#pinGate.pin-waiting .pin-dots{opacity:.35}
+#pinGate .pin-pad.pin-locked button:not([data-k="forgot"]){opacity:.4;pointer-events:none;filter:grayscale(.3)}
 
 #lock{display:none;text-align:center;padding:4rem 1rem}
 .split-trades{display:none}
@@ -384,11 +392,20 @@ body.pin-on .chrome-edge{display:none}
 </nav>
 <div class="chrome-edge top" id="chromeEdgeTop" aria-hidden="true"></div>
 <div class="chrome-edge bottom" id="chromeEdgeBottom" aria-hidden="true"></div>
-<div id="lock"><h2>Locked</h2><p class="mut" id="lockmsg">Open your secret desk link (the one ending in #t=…) once on this device.</p></div>
+<div id="lock"><h2>Locked</h2><p class="mut" id="lockmsg">This window has no desk key. Open the desk from your home screen icon or the FOMO desk Menu button in Telegram.</p></div>
 <div id="pinGate" aria-live="polite">
   <h2 id="pinTitle">Enter PIN</h2>
   <p class="pin-sub" id="pinSub">Privacy lock on this phone only. The desk never sees your PIN.</p>
   <div class="pin-dots" id="pinDots" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  <div id="pinLockout" class="pin-lockout" hidden>
+    <svg class="pin-ring" viewBox="0 0 120 120" aria-hidden="true">
+      <circle class="pin-ring-bg" cx="60" cy="60" r="52" fill="none" stroke-width="8"/>
+      <circle id="pinRingFg" class="pin-ring-fg" cx="60" cy="60" r="52" fill="none" stroke-width="8"
+        stroke-linecap="round" transform="rotate(-90 60 60)"/>
+    </svg>
+    <div class="pin-lockout-time" id="pinLockoutTime">0:60</div>
+    <p class="pin-lockout-msg" id="pinLockoutMsg">Wrong PIN, try again in 0:60</p>
+  </div>
   <p class="pin-err" id="pinErr"></p>
   <div class="pin-pad" id="pinPad">
     <button type="button" data-k="1">1</button><button type="button" data-k="2">2</button><button type="button" data-k="3">3</button>
@@ -2374,7 +2391,7 @@ let swReg = null, pushCode = localStorage.getItem("desk_push_code");
 async function registerSW() {
   if (!("serviceWorker" in navigator)) return null;
   try {
-    swReg = await navigator.serviceWorker.register("sw.js?v=27", { scope: "./" });
+    swReg = await navigator.serviceWorker.register("sw.js?v=28", { scope: "./" });
     if (swReg && swReg.update) swReg.update().catch(() => {});
     // New SW takes control → reload once so the PWA drops a blank half-cached shell.
     let refreshing = false;
@@ -2444,7 +2461,7 @@ async function refresh() {
     fetchLive();
   } catch (e) {
     if (!D) { $("lock").style.display = "block"; $("app").style.display = "none";
-      $("lockmsg").textContent = "Cannot open the desk data - wrong or missing token. Open your secret desk link again."; }
+      $("lockmsg").textContent = "This window has no desk key (or it is wrong). Open the desk from your home screen icon or the FOMO desk Menu button in Telegram."; }
     else $("upd").innerHTML = `<span class="red">Update failed · showing data from ${ago(D.ts)}</span>`;
     console.error(e);
   }
@@ -2602,25 +2619,52 @@ function pinPadSetLocked(on) {
 function pinStopCountdown() {
   if (pinCountdownTimer) { clearInterval(pinCountdownTimer); pinCountdownTimer = null; }
 }
+function pinFmtMmSs(ms) {
+  const sec = Math.max(0, Math.ceil(ms / 1000));
+  const m = Math.floor(sec / 60), s = sec % 60;
+  return m + ":" + String(s).padStart(2, "0");
+}
+function pinShowLockoutUI(on) {
+  const box = $("pinLockout");
+  if (box) box.hidden = !on;
+  if ($("pinGate")) $("pinGate").classList.toggle("pin-waiting", !!on);
+}
 function pinPaintCountdown() {
+  // Uses unlock timestamp in localStorage (lockUntil), never a decrementing counter — survives reopen.
   const st = pinTriesState();
   const left = st.lockUntil ? st.lockUntil - Date.now() : 0;
+  const ring = $("pinRingFg");
+  const C = 2 * Math.PI * 52; // r=52
   if (left <= 0) {
     pinStopCountdown();
     pinSetTries({ lockUntil: 0 });
     pinPadSetLocked(false);
-    if ($("pinErr") && /^Try again in /.test($("pinErr").textContent || "")) $("pinErr").textContent = "";
+    pinShowLockoutUI(false);
+    if (ring) ring.style.strokeDashoffset = "0";
+    if ($("pinErr")) $("pinErr").textContent = "";
+    if ($("pinTitle") && pinMode === "unlock") $("pinTitle").textContent = "Enter PIN";
+    if ($("pinSub") && pinMode === "unlock") $("pinSub").textContent = "Enter your PIN";
     return false;
   }
-  const sec = Math.max(1, Math.ceil(left / 1000));
-  if ($("pinErr")) $("pinErr").textContent = `Try again in ${sec}s`;
+  const label = pinFmtMmSs(left);
+  const total = PIN_LOCK_MS;
+  const frac = Math.min(1, left / total);
+  if ($("pinLockoutTime")) $("pinLockoutTime").textContent = label;
+  if ($("pinLockoutMsg")) $("pinLockoutMsg").textContent = "Wrong PIN, try again in " + label;
+  if (ring) {
+    ring.style.strokeDasharray = String(C);
+    ring.style.strokeDashoffset = String((1 - frac) * C);
+  }
+  if ($("pinErr")) $("pinErr").textContent = "";
+  if ($("pinTitle")) $("pinTitle").textContent = "Wrong PIN";
+  pinShowLockoutUI(true);
   pinPadSetLocked(true);
   return true;
 }
 function pinStartCountdown() {
   pinStopCountdown();
   pinPaintCountdown();
-  pinCountdownTimer = setInterval(pinPaintCountdown, 250);
+  pinCountdownTimer = setInterval(pinPaintCountdown, 200); // live tick ~5×/s for smooth ring; label changes each second
 }
 function pinLockedOut() {
   const st = pinTriesState();
@@ -2700,7 +2744,7 @@ function pinFallbackClear() {
   $("app").style.display = "none";
   $("tabs").style.display = "none";
   $("upd").textContent = "";
-  $("lockmsg").textContent = "PIN and token cleared. Open your secret desk link (the one ending in #t=…) once on this device.";
+  $("lockmsg").textContent = "PIN and token cleared on this phone. Open the desk from your home screen icon or the FOMO desk Menu button in Telegram (with your key) once.";
 }
 (function bindPin() {
   const pad = $("pinPad");
