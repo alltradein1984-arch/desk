@@ -7,7 +7,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' https: data:; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' https://api.dexscreener.com https://api.rugcheck.xyz https://api.geckoterminal.com; frame-src https://dexscreener.com https://www.dexscreener.com; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="theme-color" content="#07090c">
 <title>Desk</title>
-<!-- desk-build:29 pair-key-telegram -->
+<!-- desk-build:30 pair-persist-localstorage -->
 <script>
 // set the theme before first paint; Dark / Dim / Light (legacy auto/light migrated once)
 (function () { try {
@@ -2414,7 +2414,7 @@ let swReg = null, pushCode = localStorage.getItem("desk_push_code");
 async function registerSW() {
   if (!("serviceWorker" in navigator)) return null;
   try {
-    swReg = await navigator.serviceWorker.register("sw.js?v=29", { scope: "./" });
+    swReg = await navigator.serviceWorker.register("sw.js?v=30", { scope: "./" });
     if (swReg && swReg.update) swReg.update().catch(() => {});
     // New SW takes control → reload once so the PWA drops a blank half-cached shell.
     let refreshing = false;
@@ -2801,13 +2801,43 @@ function pairRandomCode() {
   return out.join("");
 }
 function pairLoadPending() {
-  try { return JSON.parse(sessionStorage.getItem(PAIR_PENDING_KEY) || "null"); } catch (e) { return null; }
+  // localStorage so switching to Telegram to send /pair (WebView may unload) still resumes.
+  try {
+    let raw = localStorage.getItem(PAIR_PENDING_KEY);
+    if (!raw) {
+      // migrate one-shot from older sessionStorage builds
+      try { raw = sessionStorage.getItem(PAIR_PENDING_KEY); } catch (e2) {}
+      if (raw) {
+        try { localStorage.setItem(PAIR_PENDING_KEY, raw); sessionStorage.removeItem(PAIR_PENDING_KEY); } catch (e3) {}
+      }
+    }
+    return JSON.parse(raw || "null");
+  } catch (e) { return null; }
 }
 function pairSavePending(p) {
-  try { sessionStorage.setItem(PAIR_PENDING_KEY, JSON.stringify(p)); } catch (e) {}
+  try { localStorage.setItem(PAIR_PENDING_KEY, JSON.stringify(p)); } catch (e) {}
+  try { sessionStorage.removeItem(PAIR_PENDING_KEY); } catch (e) {}
 }
 function pairClearPending() {
+  try { localStorage.removeItem(PAIR_PENDING_KEY); } catch (e) {}
   try { sessionStorage.removeItem(PAIR_PENDING_KEY); } catch (e) {}
+}
+function pairFmtLeft(ms) {
+  const sec = Math.max(0, Math.ceil(ms / 1000));
+  const m = Math.floor(sec / 60), s = sec % 60;
+  return m + ":" + String(s).padStart(2, "0");
+}
+function pairPaintRemaining() {
+  const pend = pairLoadPending();
+  if (!pend || !pend.code) return;
+  const left = Math.max(0, (pend.created || 0) + PAIR_TTL_MS - Date.now());
+  const fg = $("pairBarFg");
+  if (fg) fg.style.transform = "scaleX(" + (left / PAIR_TTL_MS) + ")";
+  if ($("pairHint")) {
+    $("pairHint").textContent = left > 0
+      ? ("Waiting for /pair… " + pairFmtLeft(left) + " left. You can switch to Telegram — reopen this window after.")
+      : "Code expired. Tap Get key via Telegram again.";
+  }
 }
 function pairStop() {
   if (pairTimer) { clearInterval(pairTimer); pairTimer = null; }
@@ -2876,36 +2906,33 @@ function pairStart() {
   if ($("pairCodeBig")) $("pairCodeBig").textContent = code;
   if ($("pairCmd")) $("pairCmd").textContent = "/pair " + code;
   if ($("pairErr")) $("pairErr").textContent = "";
-  if ($("pairHint")) $("pairHint").textContent = "Waiting for the bot… keep this window open.";
+  pairPaintRemaining();
   pairShowPanel(true);
-  pairPollOnce();
-  pairPoll = setInterval(pairPollOnce, 3000);
-  pairTimer = setInterval(() => {
-    const p = pairLoadPending();
-    if (!p) return;
-    const left = Math.max(0, (p.created + PAIR_TTL_MS) - Date.now());
-    const fg = $("pairBarFg");
-    if (fg) fg.style.transform = "scaleX(" + (left / PAIR_TTL_MS) + ")";
-    if (left <= 0) pairPollOnce();
-  }, 500);
+  pairResumeTimers();
 }
 function pairCancel() {
   pairStop(); pairClearPending(); pairShowPanel(false);
   if ($("pairErr")) $("pairErr").textContent = "";
 }
+function pairResumeTimers() {
+  pairStop();
+  pairPaintRemaining();
+  pairPollOnce();
+  pairPoll = setInterval(pairPollOnce, 3000);
+  pairTimer = setInterval(() => { pairPaintRemaining(); const p = pairLoadPending(); if (p && Date.now() > (p.created || 0) + PAIR_TTL_MS) pairPollOnce(); }, 500);
+}
 function wirePairing() {
   const a = $("pairStart"), c = $("pairCancel");
   if (a) a.onclick = pairStart;
   if (c) c.onclick = pairCancel;
-  // Resume an in-flight pairing if this tab was refreshed mid-wait
+  // Resume after Telegram switch / WebView reload — same code + remaining time, keep polling
   const pend = pairLoadPending();
-  if (pend && pend.code && Date.now() < pend.created + PAIR_TTL_MS) {
+  if (pend && pend.code && Date.now() < (pend.created || 0) + PAIR_TTL_MS) {
     if ($("pairCodeBig")) $("pairCodeBig").textContent = pend.code;
     if ($("pairCmd")) $("pairCmd").textContent = "/pair " + pend.code;
+    if ($("pairErr")) $("pairErr").textContent = "";
     pairShowPanel(true);
-    pairPoll = setInterval(pairPollOnce, 3000);
-    pairTimer = setInterval(pairPollOnce, 15000);
-    pairPollOnce();
+    pairResumeTimers();
   }
 }
 
