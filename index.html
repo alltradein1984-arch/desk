@@ -8,7 +8,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' https: data:; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' https://api.dexscreener.com https://api.rugcheck.xyz https://api.geckoterminal.com; frame-src https://dexscreener.com https://www.dexscreener.com; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="theme-color" content="#07090c">
 <title>Desk</title>
-<!-- desk-build:32 pair-persist-localstorage -->
+<!-- desk-build:35 agent-anim-chrome -->
 <script>
 // set the theme before first paint; Dark / Dim / Light (legacy auto/light migrated once)
 (function () { try {
@@ -1139,7 +1139,7 @@ function renderHome() {
       ${agents.length ? agents.map(([n, ts]) => {
         const anim = agentAnimFor(n);
         const st = animStatus(n, ts, now);
-        return `<li class="row agent-li" data-home-agent="${esc(n)}"><span class="ag-dot-live ${st}"></span><span style="text-transform:capitalize">${esc(n)}</span>${miniPulseSvg(anim && anim.hourly)}<span class="sp"></span><span class="${st === "stopped" ? "red" : "mut"}">${st === "stopped" ? "silent " : ""}${ago(ts)}</span><span class="chev">›</span></li>`; }).join("")
+        return `<li class="row agent-li" data-home-agent="${esc(n)}"><span class="ag-dot-live ${st}"></span><span style="text-transform:capitalize">${esc(n)}</span>${miniPulseSvg(anim && anim.hourly)}<span class="sp"></span><span class="${st === "stopped" ? "red" : "mut"}">${ts == null ? "n/a" : ((st === "stopped" ? "silent " : "") + ago(ts))}</span><span class="chev">›</span></li>`; }).join("")
         : `<li class="mut">No agent heartbeats yet.</li>`}</ul></div>
     <div class="card"><div class="row"><b>Latest</b><span class="sp"></span><button class="btn ghost" data-go="events">All events</button></div>
       <ul class="plain sm" style="margin-top:.4rem">${D.events.slice(0, 5).map(evLi).join("") || `<li class="mut">Nothing yet.</li>`}</ul></div>
@@ -1171,8 +1171,9 @@ function animStatus(id, ts, now) {
   return "stopped";
 }
 function miniPulseSvg(series) {
+  // Real activity only — never draw a decorative / invented line.
   if (!series || !series.length || !series.some(v => v > 0)) {
-    return `<svg class="ag-pulse-svg" viewBox="0 0 52 18" aria-hidden="true"><polyline points="0,14 8,14 16,10 24,12 32,8 40,11 52,9" fill="none" stroke="currentColor" stroke-opacity=".25" stroke-width="1.4"/></svg>`;
+    return `<span class="sm mut ag-pulse-na">n/a</span>`;
   }
   const W = 52, H = 18, m = Math.max(...series, 1);
   const pts = series.map((v, i) => {
@@ -2426,7 +2427,7 @@ let swReg = null, pushCode = localStorage.getItem("desk_push_code");
 async function registerSW() {
   if (!("serviceWorker" in navigator)) return null;
   try {
-    swReg = await navigator.serviceWorker.register("sw.js?v=32", { scope: "./" });
+    swReg = await navigator.serviceWorker.register("sw.js?v=35", { scope: "./" });
     if (swReg && swReg.update) swReg.update().catch(() => {});
     // New SW takes control → reload once so the PWA drops a blank half-cached shell.
     let refreshing = false;
@@ -2567,6 +2568,7 @@ function chromeShow(reason) {
 }
 function chromeHide() {
   if (chromePinLocked()) return;
+  if (typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches) return;
   // keep visible at very top of the page
   if ((window.scrollY || document.documentElement.scrollTop || 0) < 8) return;
   document.body.classList.add("chrome-hidden");
