@@ -1,5 +1,5 @@
 // Desk service worker. CACHE_VER bump forces phones to drop stale app shells.
-const CACHE_VER = "desk-static-v31";
+const CACHE_VER = "desk-static-v32";
 const SCOPE = self.registration.scope;
 const OPEN_HOSTS = ["fomo.family"];
 
@@ -22,6 +22,11 @@ self.addEventListener("fetch", e => {
   const req = e.request;
   if (req.method !== "GET") return;
   const dest = req.destination;
+  // Pairing grant + other encrypted feeds: never cache (network-only, ignore HTTP cache).
+  if (req.url && /\/data\/[^/]+\.enc\.json/.test(req.url)) {
+    e.respondWith(fetch(req, { cache: "no-store" }));
+    return;
+  }
   const isDoc = req.mode === "navigate" || dest === "document" || (req.url && req.url.endsWith("/index.html"));
   if (!isDoc) return; // don't touch API / iframe / image traffic
   e.respondWith((async () => {
