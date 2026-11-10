@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="referrer" content="no-referrer">
@@ -408,6 +409,7 @@ body.pin-on .chrome-edge{display:none}
     <p class="sm">Send this to <b>@Alltradein_bot</b> (your owner chat):</p>
     <p class="pair-cmd"><code id="pairCmd">/pair ······</code></p>
     <p class="pair-code-big" id="pairCodeBig">······</p>
+    <button type="button" class="btn" id="pairSend" style="width:100%;padding:1rem .5rem;font-size:1rem">Send code to Tradeinbot</button>
     <p class="sm mut" id="pairHint">Waiting for the bot… keep this window open.</p>
     <div class="pair-bar"><span id="pairBarFg"></span></div>
     <p class="sm red" id="pairErr"></p>
@@ -2900,8 +2902,11 @@ async function pairPollOnce() {
 }
 function pairStart() {
   pairStop();
-  const code = pairRandomCode();
-  const pend = { code, created: Date.now(), fails: 0 };
+  let pend = pairLoadPending();
+  if (!pend || !pend.code || Date.now() >= (pend.created || 0) + PAIR_TTL_MS) {
+    pend = { code: pairRandomCode(), created: Date.now(), fails: 0 };
+  }
+  const code = pend.code;
   pairSavePending(pend);
   if ($("pairCodeBig")) $("pairCodeBig").textContent = code;
   if ($("pairCmd")) $("pairCmd").textContent = "/pair " + code;
@@ -2909,6 +2914,19 @@ function pairStart() {
   pairPaintRemaining();
   pairShowPanel(true);
   pairResumeTimers();
+}
+function pairSendToBot() {
+  let pend = pairLoadPending();
+  if (!pend || !pend.code || Date.now() >= (pend.created || 0) + PAIR_TTL_MS) {
+    pairStart(); pend = pairLoadPending();
+  }
+  if (!pend || !pend.code) return;
+  const url = "https://t.me/Alltradein_bot?start=pair_" + encodeURIComponent(pend.code);
+  if (window.Telegram && window.Telegram.WebApp && typeof window.Telegram.WebApp.openTelegramLink === "function") {
+    window.Telegram.WebApp.openTelegramLink(url);
+  } else {
+    window.location.href = url;
+  }
 }
 function pairCancel() {
   pairStop(); pairClearPending(); pairShowPanel(false);
@@ -2925,6 +2943,7 @@ function wirePairing() {
   const a = $("pairStart"), c = $("pairCancel");
   if (a) a.onclick = pairStart;
   if (c) c.onclick = pairCancel;
+  if ($("pairSend")) $("pairSend").onclick = pairSendToBot;
   // Resume after Telegram switch / WebView reload — same code + remaining time, keep polling
   const pend = pairLoadPending();
   if (pend && pend.code && Date.now() < (pend.created || 0) + PAIR_TTL_MS) {
