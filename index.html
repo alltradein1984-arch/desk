@@ -7,7 +7,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' https: data:; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' https://api.dexscreener.com https://api.rugcheck.xyz https://api.geckoterminal.com; frame-src https://dexscreener.com https://www.dexscreener.com; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="theme-color" content="#07090c">
 <title>Desk</title>
-<!-- desk-build:25 slim-taskbar-pin-menu -->
+<!-- desk-build:26 agent-anim-charts -->
 <script>
 // set the theme before first paint; Dark / Dim / Light (legacy auto/light migrated once)
 (function () { try {
@@ -278,12 +278,74 @@ html[data-theme="light"] #v-agents,html[data-theme="light"] #v-race,html[data-th
 .rbar{position:absolute;left:0;right:0;height:26px;transition:transform .9s ease,opacity .6s}.rb{position:absolute;left:0;top:3px;height:20px;border-radius:5px;transition:width .9s ease;opacity:.85}
 .rl{position:absolute;left:.4rem;top:4px;font-size:.8rem;white-space:nowrap;text-shadow:0 1px 2px #000}
 
-/* Home agent rows + detail */
-.agent-li{cursor:pointer;padding:.35rem .15rem;border-radius:8px}
+/* Home agent rows + detail + anim charts */
+.agent-li{cursor:pointer;padding:.35rem .15rem;border-radius:8px;gap:.35rem}
 .agent-li:active,.agent-li:hover{background:var(--card2)}
 .agent-li .chev{color:var(--mut);font-size:.85rem;margin-left:.25rem}
+.agent-li .ag-pulse-svg{width:52px;height:18px;flex:0 0 auto;opacity:.9}
+.ag-dot-live{width:9px;height:9px;border-radius:50%;display:inline-block;flex:0 0 auto}
+.ag-dot-live.working{background:#2fd27a;box-shadow:0 0 0 0 rgba(47,210,122,.55);animation:pl 1.4s infinite}
+.ag-dot-live.stale{background:#ffb020;box-shadow:0 0 0 0 rgba(255,176,32,.45);animation:plAmb 1.8s infinite}
+.ag-dot-live.stopped{background:#ff5468}
+@keyframes plAmb{0%{box-shadow:0 0 0 0 rgba(255,176,32,.6)}70%{box-shadow:0 0 0 7px rgba(255,176,32,0)}100%{box-shadow:0 0 0 0 rgba(255,176,32,0)}}
 .ag-detail .ag-log li{padding:.35rem 0;border-bottom:1px solid var(--line)}
 .ag-detail .ag-log li:last-child{border:0}
+.ag-anim-grid{display:grid;grid-template-columns:1fr;gap:.65rem;margin:.55rem 0}
+.ag-viz{background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:.65rem .7rem}
+.ag-viz h3{margin:0 0 .35rem;font-size:.82rem;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.03em}
+.ag-tl{position:relative;padding-left:.9rem;margin:.2rem 0 0}
+.ag-tl::before{content:"";position:absolute;left:.28rem;top:.2rem;bottom:.2rem;width:2px;background:var(--line)}
+.ag-tl li{position:relative;padding:.28rem 0 .28rem .15rem;border:0}
+.ag-tl li::before{content:"";position:absolute;left:-.72rem;top:.55rem;width:8px;height:8px;border-radius:50%;background:var(--grn);box-shadow:0 0 0 0 rgba(47,210,122,.5);animation:pl 1.6s infinite}
+.ag-tl li:nth-child(n+4)::before{animation-delay:.2s}
+.ag-pipe{width:100%;height:150px;display:block}
+.ag-pipe .flow-dot{offset-path:path(var(--p));animation:flowDot 2.8s linear infinite}
+@keyframes flowDot{0%{offset-distance:0%;opacity:0}8%{opacity:1}92%{opacity:1}100%{offset-distance:100%;opacity:0}}
+.ag-donut-wrap{display:flex;align-items:center;gap:.8rem}
+.ag-donut-leg{font-size:.78rem;line-height:1.45}
+.ag-gauge{width:100%;height:78px}
+.ag-rank-bar{display:flex;align-items:center;gap:.4rem;margin:.22rem 0;font-size:.78rem}
+.ag-rank-bar .trk{flex:1;height:8px;background:var(--card);border-radius:4px;overflow:hidden}
+.ag-rank-bar .trk>span{display:block;height:100%;border-radius:4px;transition:width .8s ease}
+.ag-hb-pulse{display:inline-block;width:10px;height:10px;border-radius:50%;background:#5aa9ff;margin-right:.35rem;animation:pl 1.2s infinite}
+@media (prefers-reduced-motion: reduce){
+  .ag-dot-live.working,.ag-dot-live.stale,.pulse,.agdot.on,.ag-tl li::before,.ag-hb-pulse,.ag-pipe .flow-dot{animation:none !important}
+  .ag-rank-bar .trk>span{transition:none}
+}
+
+/* Auto-hide header + slim taskbar (Windows-style): slide away on scroll down, back on scroll up / edge tap / top */
+header{
+  transition: transform .28s ease, opacity .28s ease;
+  will-change: transform;
+}
+nav.tabs{
+  transition: transform .28s ease, opacity .28s ease;
+  will-change: transform;
+}
+body.chrome-hidden header{
+  transform: translateY(-110%);
+  opacity: 0;
+  pointer-events: none;
+}
+body.chrome-hidden nav.tabs{
+  transform: translate(-50%, calc(100% + 28px));
+  opacity: 0;
+  pointer-events: none;
+}
+body.pin-on header, body.pin-on nav.tabs,
+body.chrome-hidden.pin-on header, body.chrome-hidden.pin-on nav.tabs{
+  transform: none !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+body.pin-on nav.tabs{display:none !important} /* PIN already hides tabs; keep keypad clear */
+.chrome-edge{position:fixed;z-index:7;left:0;right:0;background:transparent;pointer-events:auto}
+.chrome-edge.top{top:0;height:10px}
+.chrome-edge.bottom{bottom:0;height:14px}
+body.pin-on .chrome-edge{display:none}
+@media (prefers-reduced-motion: reduce){
+  header, nav.tabs{transition:none !important}
+}
 /* Alerts search + list */
 .al-search-wrap{display:flex;flex-direction:column;gap:.45rem;margin:.5rem 0 .35rem}
 .al-search{width:100%;box-sizing:border-box;background:var(--card2);color:var(--txt);border:1px solid var(--line);border-radius:12px;padding:.7rem .85rem;font-size:1rem;-webkit-appearance:none}
@@ -316,6 +378,8 @@ html[data-theme="light"] #v-agents,html[data-theme="light"] #v-race,html[data-th
   <button type="button" data-v="events" data-logbook="1" title="Logbook"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 4h11a2 2 0 0 1 2 2v14l-3-2-3 2-3-2-3 2V6a2 2 0 0 1 2-2z"/><path d="M9 8h6M9 12h6"/></svg>Logbook</button>
   <a class="tab-link" id="tabTelegram" href="https://t.me/Alltradein_bot" target="_blank" rel="noopener noreferrer" title="Telegram bot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 5L2 12.5l6 2 2 6 3.5-4L18 18l3-13z"/><path d="M8.5 14.5L18 8"/></svg>Telegram</a>
 </nav>
+<div class="chrome-edge top" id="chromeEdgeTop" aria-hidden="true"></div>
+<div class="chrome-edge bottom" id="chromeEdgeBottom" aria-hidden="true"></div>
 <div id="lock"><h2>Locked</h2><p class="mut" id="lockmsg">Open your secret desk link (the one ending in #t=…) once on this device.</p></div>
 <div id="pinGate" aria-live="polite">
   <h2 id="pinTitle">Enter PIN</h2>
@@ -1021,8 +1085,10 @@ function renderHome() {
   </div><div>
     ${morningHtml()}
     <div class="card"><div class="row"><b>Agents</b><span class="sp"></span><span class="sm mut">tap a row · feed: ${esc(D.source)}</span></div><ul class="plain sm" style="margin-top:.4rem">
-      ${agents.length ? agents.map(([n, ts]) => { const late = (now - ts) / 60 > STALE_MIN;
-        return `<li class="row agent-li" data-home-agent="${esc(n)}"><span class="dot" style="background:${late ? "var(--red)" : "var(--grn)"}"></span><span style="text-transform:capitalize">${esc(n)}</span><span class="sp"></span><span class="${late ? "red" : "mut"}">${late ? "silent " : ""}${ago(ts)}</span><span class="chev">›</span></li>`; }).join("")
+      ${agents.length ? agents.map(([n, ts]) => {
+        const anim = agentAnimFor(n);
+        const st = animStatus(n, ts, now);
+        return `<li class="row agent-li" data-home-agent="${esc(n)}"><span class="ag-dot-live ${st}"></span><span style="text-transform:capitalize">${esc(n)}</span>${miniPulseSvg(anim && anim.hourly)}<span class="sp"></span><span class="${st === "stopped" ? "red" : "mut"}">${st === "stopped" ? "silent " : ""}${ago(ts)}</span><span class="chev">›</span></li>`; }).join("")
         : `<li class="mut">No agent heartbeats yet.</li>`}</ul></div>
     <div class="card"><div class="row"><b>Latest</b><span class="sp"></span><button class="btn ghost" data-go="events">All events</button></div>
       <ul class="plain sm" style="margin-top:.4rem">${D.events.slice(0, 5).map(evLi).join("") || `<li class="mut">Nothing yet.</li>`}</ul></div>
@@ -1036,31 +1102,185 @@ function renderHome() {
   });
 }
 
+function agentAnimRoot() {
+  return (D && D.agentsx && D.agentsx.agent_anim) || null;
+}
+function agentAnimFor(id) {
+  const A = agentAnimRoot();
+  if (!A || !A.agents) return null;
+  return A.agents[resolveAgentId(id)] || A.agents[id] || null;
+}
+function animStatus(id, ts, now) {
+  const a = agentAnimFor(id);
+  if (a && a.status) return a.status;
+  if (ts == null) return "stopped";
+  const age = now - ts;
+  if (age <= 120) return "working";
+  if (age / 60 <= STALE_MIN) return "stale";
+  return "stopped";
+}
+function miniPulseSvg(series) {
+  if (!series || !series.length || !series.some(v => v > 0)) {
+    return `<svg class="ag-pulse-svg" viewBox="0 0 52 18" aria-hidden="true"><polyline points="0,14 8,14 16,10 24,12 32,8 40,11 52,9" fill="none" stroke="currentColor" stroke-opacity=".25" stroke-width="1.4"/></svg>`;
+  }
+  const W = 52, H = 18, m = Math.max(...series, 1);
+  const pts = series.map((v, i) => {
+    const x = (i / Math.max(1, series.length - 1)) * W;
+    const y = H - 2 - (v / m) * (H - 4);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+  return `<svg class="ag-pulse-svg" viewBox="0 0 ${W} ${H}" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="#2fd27a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+}
+function sparkBarsSvg(series, label) {
+  if (!series || !series.length || !series.some(v => v > 0)) return `<p class="sm mut">n/a — no data yet for ${esc(label || "this chart")}</p>`;
+  const W = 320, H = 72, m = Math.max(...series, 1), n = series.length, gap = 1.5;
+  const bw = Math.max(2, (W - gap * (n - 1)) / n);
+  const bars = series.map((v, i) => {
+    const h = Math.max(v > 0 ? 2 : 0, (v / m) * (H - 8));
+    const x = i * (bw + gap), y = H - h;
+    return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="1.2" fill="#5aa9ff" fill-opacity="${0.35 + 0.65 * (v / m)}"/>`;
+  }).join("");
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:${H}px" role="img" aria-label="${esc(label || "hourly")}"><g>${bars}</g></svg>`;
+}
+function donutSvg(d) {
+  if (!d) return `<p class="sm mut">n/a — no rug-check results in the last 24h</p>`;
+  const parts = [
+    { k: "passed", v: d.passed || 0, c: "#2fd27a" },
+    { k: "failed", v: d.failed || 0, c: "#ff5468" },
+    { k: "rugs", v: d.rugs || 0, c: "#ffb020" }
+  ];
+  const total = parts.reduce((s, p) => s + p.v, 0);
+  if (!total) return `<p class="sm mut">n/a — no rug-check results in the last 24h</p>`;
+  const R = 34, C = 2 * Math.PI * R;
+  let off = 0;
+  const rings = parts.filter(p => p.v > 0).map(p => {
+    const len = (p.v / total) * C;
+    const el = `<circle cx="40" cy="40" r="${R}" fill="none" stroke="${p.c}" stroke-width="10" stroke-dasharray="${len.toFixed(2)} ${(C - len).toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}" transform="rotate(-90 40 40)"/>`;
+    off += len;
+    return el;
+  }).join("");
+  const leg = parts.map(p => `<div><span class="pdot" style="background:${p.c}"></span>${esc(p.k)} <b>${p.v}</b></div>`).join("");
+  return `<div class="ag-donut-wrap"><svg width="80" height="80" viewBox="0 0 80 80">${rings}<text x="40" y="44" text-anchor="middle" fill="currentColor" font-size="13" font-weight="700">${total}</text></svg><div class="ag-donut-leg">${leg}</div></div>`;
+}
+function gaugeSvg(g) {
+  if (!g) return `<p class="sm mut">n/a — no risk decisions in the last 24h</p>`;
+  const pct = Math.max(0, Math.min(100, g.pct_approved ?? 0));
+  const ang = -90 + (pct / 100) * 180;
+  const rad = ang * Math.PI / 180;
+  const x = 80 + 54 * Math.cos(rad), y = 70 + 54 * Math.sin(rad);
+  return `<svg class="ag-gauge" viewBox="0 0 160 90" role="img" aria-label="approvals">
+    <path d="M20 70 A60 60 0 0 1 140 70" fill="none" stroke="var(--line)" stroke-width="10" stroke-linecap="round"/>
+    <path d="M20 70 A60 60 0 0 1 140 70" fill="none" stroke="#2fd27a" stroke-width="10" stroke-linecap="round"
+      stroke-dasharray="${(pct / 100 * Math.PI * 60).toFixed(1)} 400"/>
+    <line x1="80" y1="70" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="#ffb020" stroke-width="2.4" stroke-linecap="round"/>
+    <circle cx="80" cy="70" r="3.5" fill="#ffb020"/>
+    <text x="80" y="88" text-anchor="middle" fill="currentColor" font-size="11">${pct}% approved · ${g.approved}/${(g.approved + g.blocked)}</text>
+  </svg>`;
+}
+function curveMiniSvg(curve) {
+  if (!curve || !curve.pts || curve.pts.length < 2) return `<p class="sm mut">n/a — PAPER curve starts after the first closed trade</p>`;
+  const pts = curve.pts, W = 320, H = 80;
+  const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+  const minY = Math.min(...ys), maxY = Math.max(...ys), span = Math.max(1e-6, maxY - minY);
+  const X = t => ((t - xs[0]) / Math.max(1, xs[xs.length - 1] - xs[0])) * W;
+  const Y = v => H - 6 - ((v - minY) / span) * (H - 14);
+  const line = pts.map(p => `${X(p[0]).toFixed(1)},${Y(p[1]).toFixed(1)}`).join(" ");
+  const last = ys[ys.length - 1], c = last >= (curve.start || last) ? "#2fd27a" : "#ff5468";
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:${H}px"><polyline points="${line}" fill="none" stroke="${c}" stroke-width="2"/><circle cx="${X(xs[xs.length - 1]).toFixed(1)}" cy="${Y(last).toFixed(1)}" r="3.5" fill="${c}"/></svg>
+    <div class="sm mut">balance ${usd(curve.balance)} · start ${usd(curve.start)}</div>`;
+}
+function ranksHtml(r) {
+  if (!r || !r.rows || !r.rows.length) return `<p class="sm mut">n/a — need two leader_history days to show rank changes</p>`;
+  const maxD = Math.max(1, ...r.rows.map(x => Math.abs(x.delta == null ? 1 : x.delta)));
+  return `<div class="sm mut" style="margin-bottom:.3rem">${esc(r.board)} · ${esc(r.prev_day)} → ${esc(r.day)}</div>` + r.rows.map(x => {
+    const d = x.delta, up = d != null && d > 0, down = d != null && d < 0;
+    const w = d == null ? 12 : Math.max(8, Math.abs(d) / maxD * 100);
+    const col = up ? "#2fd27a" : down ? "#ff5468" : "#8a94a6";
+    const lab = x.new ? "new" : (d > 0 ? `↑${d}` : d < 0 ? `↓${Math.abs(d)}` : "·");
+    return `<div class="ag-rank-bar"><span style="min-width:1.6rem">#${x.rank}</span><span style="min-width:6.5rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.handle)}</span><span class="trk"><span style="width:${w}%;background:${col}"></span></span><b style="color:${col};min-width:2.2rem;text-align:right">${lab}</b></div>`;
+  }).join("");
+}
+function publishPulseHtml(v) {
+  if (!v || (!v.last_publish && !(v.series && v.series.some(x => x > 0)))) return `<p class="sm mut">n/a — no publish events yet</p>`;
+  const age = v.last_publish ? ago(v.last_publish) : "n/a";
+  return `<div class="row"><span class="ag-hb-pulse"></span><span class="sm">last publish ${esc(age)}${v.last_sha ? ` · ${esc(v.last_sha)}` : ""}</span></div>${sparkBarsSvg(v.series, "publishes / hour")}`;
+}
+function pipelineSvg(pipe, focusId) {
+  if (!pipe || !pipe.nodes) return `<p class="sm mut">n/a — pipeline not in feed</p>`;
+  // compact layout of core path + side nodes
+  const layout = {
+    scanner: [28, 28], auditor: [110, 28], analyst: [192, 28], risk: [274, 28], executor: [356, 28],
+    rugwatch: [110, 88], follow: [28, 88], autopaper: [192, 88],
+    telegram: [300, 130], webpush: [360, 130],
+    boards: [28, 130], market: [274, 88], publisher: [356, 88], bot: [192, 130], mywallets: [110, 130]
+  };
+  const statusC = { working: "#2fd27a", stale: "#ffb020", stopped: "#ff5468" };
+  const nodes = pipe.nodes.map(n => {
+    const [x, y] = layout[n.id] || [40, 40];
+    const on = n.id === focusId;
+    const c = statusC[n.status] || "#8a94a6";
+    return `<g><circle cx="${x}" cy="${y}" r="${on ? 9 : 7}" fill="${c}" fill-opacity="${on ? .95 : .75}"/>
+      <text x="${x}" y="${y + 18}" text-anchor="middle" fill="currentColor" font-size="7.5">${esc(n.name)}</text></g>`;
+  }).join("");
+  const reduce = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const edges = (pipe.edges || []).map((e, i) => {
+    const a = layout[e.from], b = layout[e.to];
+    if (!a || !b) return "";
+    const active = e.last && (Date.now() / 1000 - e.last) < 3600;
+    const delay = (i % 5) * 0.35;
+    const motion = reduce ? "" : `<circle r="2.4" fill="#5aa9ff" opacity="${active ? 0.95 : 0.3}"><animateMotion dur="2.8s" begin="${delay}s" repeatCount="indefinite" path="M ${a[0]} ${a[1]} L ${b[0]} ${b[1]}"/></circle>`;
+    return `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${active ? "#5aa9ff" : "var(--line)"}" stroke-width="${active ? 1.6 : 1}" stroke-opacity="${active ? .85 : .45}"/>${motion}`;
+  }).join("");
+  return `<svg class="ag-pipe" viewBox="0 0 400 155" role="img" aria-label="desk pipeline">${edges}${nodes}</svg>
+    <div class="sm mut">Scanner → Auditor/Rugwatch → Analyst → Risk → Executor → Telegram/Webpush · dots mark recent hops</div>`;
+}
+function vizBlock(ag) {
+  const v = ag && ag.viz;
+  if (!v) return `<div class="ag-viz"><h3>Chart</h3><p class="sm mut">n/a</p></div>`;
+  let body = `<p class="sm mut">n/a</p>`;
+  if (v.kind === "bars") body = sparkBarsSvg(v.series, v.label);
+  else if (v.kind === "donut") body = donutSvg(v.donut);
+  else if (v.kind === "gauge") body = gaugeSvg(v.gauge);
+  else if (v.kind === "curve") body = curveMiniSvg(v.curve);
+  else if (v.kind === "ranks") body = ranksHtml(v.ranks);
+  else if (v.kind === "heartbeat") body = publishPulseHtml(v);
+  else if (v.kind === "stat") body = `<div class="agbig">${v.value == null ? "n/a" : v.value}</div><div class="sm mut">${esc(v.label)}</div>${sparkBarsSvg(v.series, "syncs / hour")}`;
+  else if (v.kind === "timeline") body = sparkBarsSvg(v.series, v.label);
+  return `<div class="ag-viz"><h3>${esc(v.label || "Chart")}</h3>${body}</div>`;
+}
 function renderHomeAgent(id) {
   const now = Date.now() / 1000;
   const ts = (D.agents || {})[id];
-  const late = ts == null ? true : (now - ts) / 60 > STALE_MIN;
+  const anim = agentAnimFor(id);
+  const st = animStatus(id, ts, now);
   const blurb = AGENT_BLURB[id] || AGENT_BLURB[(id || "").toLowerCase()] || "Desk worker — see latest actions below.";
   const name = (id || "").charAt(0).toUpperCase() + (id || "").slice(1);
-  // Prefer agents-feed activity (has agent label); fall back to desk events filtered by agent id.
   const fromAg = ((D.agentsx || {}).activity || []).filter(e => resolveAgentId(e.agent) === resolveAgentId(id));
   const fromDesk = agentEvents(id);
-  const rows = (fromAg.length ? fromAg : fromDesk.map(e => ({ ts: e.ts, text: e.title, why: e.sub, agent: e.agent, kind: e.kind }))).slice(0, 40);
-  const status = ts == null ? "no heartbeat" : late ? `silent ${ago(ts)}` : `heartbeat ${ago(ts)}`;
-  const log = rows.length ? rows.map(e => {
+  const rows = (anim && anim.timeline && anim.timeline.length ? anim.timeline
+    : (fromAg.length ? fromAg : fromDesk.map(e => ({ ts: e.ts, text: e.title, why: e.sub, agent: e.agent, kind: e.kind })))).slice(0, 40);
+  const status = ts == null ? "no heartbeat" : st === "stopped" ? `silent ${ago(ts)}` : st === "stale" ? `stale ${ago(ts)}` : `heartbeat ${ago(ts)}`;
+  const log = rows.length ? `<ul class="plain sm ag-log ag-tl">${rows.map(e => {
     const title = scrubSafe(e.text || e.title || e.kind || "");
     const why = scrubSafe(e.why || e.sub || "");
     return `<li><div class="row"><b class="sm">${esc(title)}</b><span class="sp"></span><span class="sm mut">${tmAms(e.ts)}</span></div>
       ${why ? `<div class="sm mut">${esc(why)}</div>` : ""}</li>`;
-  }).join("") : `<li class="mut">No recent actions logged for this agent.</li>`;
+  }).join("")}</ul>` : `<p class="sm mut">n/a — no recent actions logged for this agent.</p>`;
+  const hourly = anim && anim.hourly;
+  const pipe = agentAnimRoot() && agentAnimRoot().pipeline;
   $("v-home").innerHTML = `<div class="card ag-detail">
     <div class="row"><button class="btn ghost" id="homeAgBack">‹ Agents</button><span class="sp"></span>
-      <span class="dot" style="background:${late ? "var(--red)" : "var(--grn)"}"></span>
-      <span class="sm ${late ? "red" : "grn"}">${esc(status)}</span></div>
+      <span class="ag-dot-live ${st}"></span>
+      <span class="sm ${st === "stopped" ? "red" : st === "stale" ? "amb" : "grn"}">${esc(status)}</span></div>
     <h2 style="margin:.55rem 0 .2rem;text-transform:capitalize">${esc(name)}</h2>
     <p class="sm mut">${esc(blurb)}</p>
+    <div class="ag-anim-grid">
+      <div class="ag-viz"><h3>Activity / hour (24h)</h3>${sparkBarsSvg(hourly, "activity / hour")}</div>
+      ${vizBlock(anim)}
+      <div class="ag-viz"><h3>Pipeline</h3>${pipelineSvg(pipe, resolveAgentId(id))}</div>
+    </div>
     <div class="row" style="margin-top:.4rem"><b>Latest actions</b><span class="sp"></span><span class="sm mut">Amsterdam time · scrubbed</span></div>
-    <ul class="plain sm ag-log" style="margin-top:.35rem">${log}</ul>
+    ${log}
   </div>`;
   const b = $("homeAgBack"); if (b) b.onclick = () => { homeAgentSel = null; renderHome(); };
 }
@@ -2150,7 +2370,7 @@ let swReg = null, pushCode = localStorage.getItem("desk_push_code");
 async function registerSW() {
   if (!("serviceWorker" in navigator)) return null;
   try {
-    swReg = await navigator.serviceWorker.register("sw.js?v=25", { scope: "./" });
+    swReg = await navigator.serviceWorker.register("sw.js?v=26", { scope: "./" });
     if (swReg && swReg.update) swReg.update().catch(() => {});
     // New SW takes control → reload once so the PWA drops a blank half-cached shell.
     let refreshing = false;
@@ -2276,10 +2496,57 @@ function pinPaintDots() {
   const dots = document.querySelectorAll("#pinDots i");
   dots.forEach((d, i) => d.classList.toggle("on", i < pinBuf.length));
 }
+
+/** Windows-style auto-hide for header + slim taskbar. Never runs while the PIN gate is open. */
+let chromeLastY = 0, chromeHidden = false, chromeTick = 0;
+function chromePinLocked() {
+  return document.body.classList.contains("pin-on") || ($("pinGate") && $("pinGate").classList.contains("on"));
+}
+function chromeShow(reason) {
+  if (chromePinLocked()) { document.body.classList.remove("chrome-hidden"); chromeHidden = false; return; }
+  document.body.classList.remove("chrome-hidden");
+  chromeHidden = false;
+}
+function chromeHide() {
+  if (chromePinLocked()) return;
+  // keep visible at very top of the page
+  if ((window.scrollY || document.documentElement.scrollTop || 0) < 8) return;
+  document.body.classList.add("chrome-hidden");
+  chromeHidden = true;
+}
+function chromeOnScroll() {
+  if (chromePinLocked()) { chromeShow("pin"); return; }
+  const y = window.scrollY || document.documentElement.scrollTop || 0;
+  const now = Date.now();
+  if (now - chromeTick < 40) { chromeLastY = y; return; } // light throttle for Android
+  chromeTick = now;
+  const dy = y - chromeLastY;
+  chromeLastY = y;
+  if (y < 8) { chromeShow("top"); return; }
+  if (dy > 6) chromeHide();
+  else if (dy < -6) chromeShow("up");
+}
+function wireChromeAutohide() {
+  chromeLastY = window.scrollY || 0;
+  window.addEventListener("scroll", chromeOnScroll, { passive: true });
+  const reveal = () => chromeShow("edge");
+  const top = $("chromeEdgeTop"), bot = $("chromeEdgeBottom");
+  if (top) top.addEventListener("click", reveal);
+  if (bot) bot.addEventListener("click", reveal);
+  // tap near top/bottom of the viewport also reveals (in case edges are covered)
+  document.addEventListener("click", (e) => {
+    if (chromePinLocked() || !chromeHidden) return;
+    const y = e.clientY;
+    if (y <= 16 || y >= (window.innerHeight - 20)) chromeShow("edge-tap");
+  }, true);
+}
+
 function pinShow(mode) {
   pinMode = mode; pinBuf = ""; pinPaintDots();
   $("pinErr").textContent = "";
   $("pinGate").classList.add("on");
+  document.body.classList.add("pin-on");
+  document.body.classList.remove("chrome-hidden"); // never auto-hide on PIN; keypad stays fully visible
   $("lock").style.display = "none";
   $("app").style.display = "none";
   $("tabs").style.display = "none";
@@ -2303,12 +2570,14 @@ function pinShow(mode) {
     $("pinForgot").style.display = ""; if (fb) fb.style.display = "none";
   }
 }
-function pinHide() { $("pinGate").classList.remove("on"); }
+function pinHide() { $("pinGate").classList.remove("on"); document.body.classList.remove("pin-on"); }
 function startApp() {
   pinHide();
   $("lock").style.display = "none";
   $("app").style.display = "";
   $("tabs").style.display = "";
+  document.body.classList.remove("pin-on", "chrome-hidden");
+  wireChromeAutohide();
   registerSW(); show(view); refresh();
   setInterval(refresh, 30000); setInterval(() => D && renderHeader(), 30000);
 }
