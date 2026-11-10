@@ -5,10 +5,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="referrer" content="no-referrer">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' https: data:; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' https://api.dexscreener.com https://api.rugcheck.xyz https://api.geckoterminal.com; frame-src https://dexscreener.com https://www.dexscreener.com; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' https: data:; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' https://api.dexscreener.com https://api.rugcheck.xyz https://api.geckoterminal.com https://api.mainnet-beta.solana.com; frame-src https://dexscreener.com https://www.dexscreener.com; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="theme-color" content="#07090c">
 <title>Desk</title>
-<!-- desk-build:37 early-rank -->
+<!-- desk-build:38 coin-race -->
 <script>
 // set the theme before first paint; Dark / Dim / Light (legacy auto/light migrated once)
 (function () { try {
@@ -222,8 +222,8 @@ html[data-theme="light"] .btn{background:var(--grn);color:#fff}html[data-theme="
 html[data-theme="light"] .hdr-btn{background:#f8fafc;color:#0b1220;border-color:#cbd5e1}
 html[data-theme="light"] .grn{color:#067a41}html[data-theme="light"] .red{color:#c0122c}html[data-theme="light"] .amb{color:#9a6700}
 html[data-theme="light"] .item,html[data-theme="light"] .chk,html[data-theme="light"] ul.plain li{border-bottom-color:#e2e8f0}
-html[data-theme="light"] #v-agents,html[data-theme="light"] #v-race,#v-early,html[data-theme="light"] #v-coin{background:#ffffff;color:#0b1220;--bg:#ffffff;--card:#ffffff;--card2:#f3f5f8;--line:#e2e8f0;--txt:#0b1220;--mut:#4b5565;--grn:#067a41;--red:#c0122c;--amb:#9a6700}
-html[data-theme="dim"] #v-agents,html[data-theme="dim"] #v-race,#v-early,html[data-theme="dim"] #v-coin{background:#f4f6f9;color:#11161d;--bg:#f4f6f9;--card:#ffffff;--card2:#eef1f5;--line:#dde3ea;--txt:#11161d;--mut:#5d6775;--grn:#0e9f56;--red:#d42c43;--amb:#a86a0c}
+html[data-theme="light"] #v-agents,html[data-theme="light"] #v-race,html[data-theme="light"] #v-early,html[data-theme="light"] #v-coin{background:#ffffff;color:#0b1220;--bg:#ffffff;--card:#ffffff;--card2:#f3f5f8;--line:#e2e8f0;--txt:#0b1220;--mut:#4b5565;--grn:#067a41;--red:#c0122c;--amb:#9a6700}
+html[data-theme="dim"] #v-agents,html[data-theme="dim"] #v-race,html[data-theme="dim"] #v-early,html[data-theme="dim"] #v-coin{background:#f4f6f9;color:#11161d;--bg:#f4f6f9;--card:#ffffff;--card2:#eef1f5;--line:#dde3ea;--txt:#11161d;--mut:#5d6775;--grn:#0e9f56;--red:#d42c43;--amb:#a86a0c}
 html[data-theme="light"] .rl{text-shadow:none;color:#0b1220}
 #theme{background:var(--card2);color:var(--txt);border:1px solid var(--line);border-radius:99px;font-size:.72rem;padding:.2rem .6rem;cursor:pointer}
 
@@ -274,11 +274,16 @@ html[data-theme="light"] .rl{text-shadow:none;color:#0b1220}
 }
 
 /* Agents + Race + Coin: dark paper panels only in Dark theme; Dim/Light inherit page theme */
-html[data-theme="dark"] #v-agents,html[data-theme="dark"] #v-race,#v-early,html[data-theme="dark"] #v-coin,
-html:not([data-theme]) #v-agents,html:not([data-theme]) #v-race,#v-early,html:not([data-theme]) #v-coin{
+html[data-theme="dark"] #v-agents,html[data-theme="dark"] #v-race,html[data-theme="dark"] #v-early,html[data-theme="dark"] #v-coin,
+html:not([data-theme]) #v-agents,html:not([data-theme]) #v-race,html:not([data-theme]) #v-early,html:not([data-theme]) #v-coin{
   --bg:#000;--card:#0d1014;--card2:#151a21;--line:#1f262f;--txt:#eef2f6;--mut:#8792a2;--grn:#2fd27a;--red:#ff5468;--amb:#ffb648;color:var(--txt);background:#000;margin:-1rem -1rem 0;padding:1rem;min-height:100vh}
-html[data-theme="dim"] #v-agents,html[data-theme="dim"] #v-race,#v-early,html[data-theme="dim"] #v-coin,
-html[data-theme="light"] #v-agents,html[data-theme="light"] #v-race,#v-early,html[data-theme="light"] #v-coin{margin:-1rem -1rem 0;padding:1rem;min-height:100vh}
+html[data-theme="dim"] #v-agents,html[data-theme="dim"] #v-race,html[data-theme="dim"] #v-early,html[data-theme="dim"] #v-coin,
+html[data-theme="light"] #v-agents,html[data-theme="light"] #v-race,html[data-theme="light"] #v-early,html[data-theme="light"] #v-coin{margin:-1rem -1rem 0;padding:1rem;min-height:100vh}
+
+.src-tag{font-size:.62rem;font-weight:700;margin-right:.28rem;padding:.04rem .28rem;border-radius:4px;border:1px solid var(--line);color:var(--mut);vertical-align:middle;white-space:nowrap}
+.coin-live-wrap{display:grid;grid-template-columns:1fr;gap:.65rem;margin:.5rem 0}
+@media(min-width:720px){.coin-live-wrap{grid-template-columns:1.15fr .85fr;align-items:start}}
+#holderRaceBars{overflow:auto;max-height:360px}
 .agcard{background:var(--card);border-color:var(--line)}
 .agbig{font-size:2rem;font-weight:800;letter-spacing:-.02em;margin:.2rem 0}
 .agsplit{display:grid;grid-template-columns:1fr;gap:0}@media(min-width:720px){.agsplit{grid-template-columns:1fr 1fr;gap:.9rem}}
@@ -1836,7 +1841,8 @@ function renderWhales() {
   if (!V) { $("v-whales").innerHTML = `<div class="card mut">No followed wallets yet.</div>`; return; }
   const eq = V.equity || {};
   const topN = V.top_n || V.wallets.length;
-  const w = V.wallets.map(x => `<div class="item"><div class="row"><b><span class="whale-rank">#${x.rank}</span> ${esc(x.handle)}</b>${rankArrow(x.rank_delta, x.rank_change)}
+  const wal = (V.wallets || []).filter(x => hasPlat(x.platforms, platSrc));
+  const w = wal.map(x => `<div class="item"><div class="row"><b><span class="whale-rank">#${x.rank}</span> ${esc(x.handle)}</b>${srcTags(x.platforms)}${rankArrow(x.rank_delta, x.rank_change)}
       <span class="stage ${x.label === "sniper / short holder" ? "st-rejected" : x.label === "consistent winner" ? "st-held" : ""}">${esc(x.label)}</span>
       ${x.today ? `<span class="stage st-watch">today</span>` : ""}<span class="sp"></span><span class="score ${x.score >= 60 ? "hi" : "lo"}">${Math.round(x.score)}</span></div>
       <div class="sm mut">${esc(x.platforms || "")} · win ${x.win_rate != null ? Math.round(x.win_rate * 100) + "%" : "–"} · hold ${x.hold_min != null ? Math.round(x.hold_min) + " min" : "–"}
@@ -1870,13 +1876,23 @@ function renderWhales() {
       ${eqSvg(eq.points)}</div>
     <div class="card"><b>Hot coins (most bought by followed wallets, 24h)</b>${hot || `<p class="sm mut">No buys yet.</p>`}</div>
     <div class="card"><b>Live log</b><ul class="plain" style="margin-top:.4rem">${lg || `<li class="mut">Nothing yet.</li>`}</ul></div>
-    <div class="card"><b>Top ${topN} traders</b><p class="sm mut" style="margin:.25rem 0 .4rem">Ranked by desk follow score · ▲/▼ = change since last daily board refresh · 7d/30d = best board rank that window · desk still follows the wider list for alerts</p>${w}</div>`;
+    <div class="card"><div class="row"><b>Top ${topN} traders</b><span class="sp"></span><span class="sm mut">${platSrc === "all" ? wal.length + " shown" : platLabel(platSrc) + " · " + wal.length}</span></div>
+    ${platChipHtml(platSrc)}
+    <p class="sm mut" style="margin:.25rem 0 .4rem">Ranked by desk follow score · ▲/▼ = change since last daily board refresh · 7d/30d = best board rank that window · desk still follows the wider list for alerts · All = every trader from FOMO, Pump.fun and GMGN in one list</p>${w || `<p class="sm mut">No traders from ${esc(platLabel(platSrc))} yet.</p>`}</div>`;
+  wirePlatChips($("v-whales"), renderWhales);
 }
 
 // ================= Agents tab (agentsview.py) · PAPER only, real desk data, nothing here trades =================
 const PLAT_C = { "FOMO": "#5aa9ff", "GMGN": "#ffb648", "pump.fun": "#3ee0c5" };
 const LIVE = {}; let liveTs = 0, agSel = null, agSort = "pnl";
 const raceSt = { i: 0, play: true, timer: null };
+let platSrc = "all";
+const HOLD_CACHE = {}; const HOLD_TTL_MS = 5 * 60 * 1000;
+let holderOpen = null;
+const holderRaceSt = { mint: null, nodes: {} };
+const PUB_RPC = "https://api.mainnet-beta.solana.com";
+const TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
+const TOKEN_2022 = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
 const kfmt = x => x == null ? "–" : Math.abs(x) >= 1e6 ? (x / 1e6).toFixed(2) + "M" : Math.abs(x) >= 1e3 ? (x / 1e3).toFixed(1) + "K" : Math.round(x).toString();
 const kusd = x => x == null ? "–" : (x < 0 ? "-$" : "$") + kfmt(Math.abs(x));
 const secAgo = ts => ts ? Math.max(0, Math.round(Date.now() / 1000 - ts)) : null;
@@ -1913,7 +1929,7 @@ async function fetchHolders(m) {
     const r = await fetch(`https://api.rugcheck.xyz/v1/tokens/${m}/report`, { cache: "no-store", referrerPolicy: "no-referrer" });
     if (!r.ok) throw new Error(r.status);
     const j = await r.json();
-    const top = (j.topHolders || []).slice(0, 20), top10 = top.slice(0, 10).reduce((a, h) => a + (h.pct || 0), 0);
+    const top = (j.topHolders || []).slice(0, 100), top10 = top.slice(0, 10).reduce((a, h) => a + (h.pct || 0), 0);
     const tk = j.token || {};
     LIVE[m] = Object.assign(LIVE[m] || {}, { holders: Number.isFinite(j.totalHolders) ? j.totalHolders : null, rugged: !!j.rugged, rcTs: Date.now() / 1000,
       rc: { total: Number.isFinite(j.totalHolders) ? j.totalHolders : null, top, top10: top.length ? top10 : null, markets: j.markets || [], known: j.knownAccounts || {},
@@ -2036,7 +2052,7 @@ async function fetchMintLink(mint) {
         supply = (j.token || {}).supply ?? null;
         // Seed LIVE so the coin screen can reuse this report without a second hit.
         if (!LIVE[mint] || !LIVE[mint].rcTs) {
-          const top = (j.topHolders || []).slice(0, 20);
+          const top = (j.topHolders || []).slice(0, 100);
           const tk = j.token || {};
           LIVE[mint] = Object.assign(LIVE[mint] || {}, { holders: Number.isFinite(j.totalHolders) ? j.totalHolders : null, rugged: !!j.rugged, rcTs: Date.now() / 1000,
             rc: { total: Number.isFinite(j.totalHolders) ? j.totalHolders : null, top, top10: null, markets: j.markets || [], known: j.knownAccounts || {},
@@ -2191,6 +2207,217 @@ function holderKnownName(h, A, known) {
   return null;
 }
 
+
+function platList(ps) {
+  if (Array.isArray(ps)) return ps.filter(Boolean);
+  return String(ps || "").split(/[,;/|]/).map(x => x.trim()).filter(Boolean);
+}
+function hasPlat(ps, src) { return !src || src === "all" || platList(ps).includes(src); }
+function platLabel(src) { return ({ all: "All", FOMO: "FOMO", "pump.fun": "Pump.fun", GMGN: "GMGN" })[src] || src; }
+function platChipHtml(cur) {
+  const items = [["all", "All"], ["FOMO", "FOMO"], ["pump.fun", "Pump.fun"], ["GMGN", "GMGN"]];
+  return `<div class="al-chips plat-chips" style="margin:.4rem 0">${items.map(([id, lab]) => `<button type="button" class="al-chip${cur === id ? " on" : ""}" data-plat="${id}">${lab}</button>`).join("")}</div>`;
+}
+function wirePlatChips(root, redraw) {
+  (root || document).querySelectorAll("[data-plat]").forEach(b => { b.onclick = () => { platSrc = b.dataset.plat; redraw(); }; });
+}
+function srcTags(ps) {
+  return platList(ps).map(p => `<span class="src-tag">${esc(p === "pump.fun" ? "Pump.fun" : p)}</span>`).join("");
+}
+function coinRaceRows() {
+  return earlyRankRows().filter(c => c.audit === "pass" && c.rug === "pass");
+}
+function coinRaceBoardHtml() {
+  const rows = coinRaceRows();
+  const note = `<p class="sm mut">Only early-buy flags that passed auditor and rug/safety checks (not rugged). Ranking is the desk's score, not advice. PAPER only.</p>`;
+  if (!rows.length) {
+    return `<div class="card agcard" id="coinRaceBoard"><div class="row"><b>🏁 Coin race</b><span class="sp"></span><span class="badge b-paper">PAPER</span></div>${note}<p class="sm mut">No early coin passed every check yet.</p></div>`;
+  }
+  const mx = Math.max(...rows.map(c => c.score != null ? Math.abs(c.score) : 0), 1);
+  const bars = rows.map((c, i) => {
+    const sc = c.score != null ? Math.round(c.score) : null;
+    const w = sc != null ? Math.max(2, Math.abs(sc) / mx * 70) : 2;
+    const bg = sc == null ? "#6b7280" : (sc >= 70 ? "#2fd27a" : "#5aa9ff");
+    return `<div class="rbar tap" data-early="${esc(c.mint)}" style="transform:translateY(${i * 30}px);opacity:1"><span class="rb" style="width:${w}%;background:${bg}"></span><span class="rl">#${i + 1} ${esc(c.sym || shortMint(c.mint))} <b>${sc != null ? sc : "n/a"}</b></span></div>`;
+  }).join("");
+  return `<div class="card agcard" id="coinRaceBoard"><div class="row"><b>🏁 Coin race</b><span class="sp"></span><span class="badge b-paper">PAPER</span></div>${note}
+    <div id="coinRaceBars" style="position:relative;height:${rows.length * 30}px">${bars}</div>
+    <div class="sm mut" style="margin-top:.35rem">${rows.length} early-buy flag${rows.length === 1 ? "" : "s"} that passed every check.</div></div>`;
+}
+function holdersListHtml(top, A, known, labels, opts) {
+  opts = opts || {};
+  const rawSum = top.reduce((s, h) => s + (+h.pct || 0), 0);
+  const pctMul = (rawSum > 0 && rawSum <= 1.5) ? 100 : 1;
+  const poolPct = top.reduce((s, h) => s + (labels(h).includes("LP / pool") ? ((+h.pct || 0) * pctMul) : 0), 0);
+  const poolLine = (!opts.skipPoolLine && poolPct) ? `<div class="sm mut" style="margin:.25rem 0 .15rem">LP / pool share (labeled AMM/pool accounts in this list): <b>${poolPct.toFixed(2)}%</b></div>` : "";
+  if (!top.length) return opts.empty || "";
+  return poolLine + top.slice(0, opts.limit || 100).map((h, i) => {
+    const lb = labels(h);
+    const nm = holderKnownName(h, A, known);
+    const who = nm ? `<b>${esc(nm)}</b> ${walletLink(h.owner, shortMint(h.owner))}` : walletLink(h.owner);
+    const isPool = lb.includes("LP / pool");
+    return `<div class="holder-row${isPool ? "" : " tap"}" data-holder="${esc(h.owner || "")}" data-pool="${isPool ? "1" : ""}">
+      <div class="row sm" style="margin-top:.3rem;flex-wrap:wrap;gap:.2rem"><span class="mut" style="width:1.4rem">${i + 1}</span>${who}${lb.map(x => `<span class="stage" style="margin-left:.25rem">${esc(x)}</span>`).join("")}<span class="sp"></span><b>${((+h.pct || 0) * pctMul).toFixed(2)}%</b></div>
+      <div class="holder-more" hidden></div>
+    </div>`;
+  }).join("");
+}
+function fillHolderMore(n, data) {
+  const box = n && n.querySelector(".holder-more");
+  if (!box) return;
+  if (!data) { box.hidden = true; box.innerHTML = ""; return; }
+  box.hidden = false;
+  if (data.pool) { box.innerHTML = `<div class="sm mut" style="margin:.25rem 0 .15rem 1.4rem"><span class="stage">POOL</span> AMM / pool wallet — holdings not fetched.</div>`; return; }
+  if (data.loading) { box.innerHTML = `<div class="sm mut" style="margin:.25rem 0 .15rem 1.4rem">Loading holdings…</div>`; return; }
+  if (data.err || data.unknown) { box.innerHTML = `<div class="sm mut" style="margin:.25rem 0 .15rem 1.4rem">Other coins: unknown</div>`; return; }
+  if (!data.rows || !data.rows.length) { box.innerHTML = `<div class="sm mut" style="margin:.25rem 0 .15rem 1.4rem">No other coins found.</div>`; return; }
+  box.innerHTML = `<div class="sm mut" style="margin:.25rem 0 .15rem 1.4rem">Other coins (read-only, top ${data.rows.length} by USD where known):</div>` +
+    data.rows.map(r => `<div class="row sm" style="margin-left:1.4rem;margin-top:.15rem"><span>${esc(r.sym || shortMint(r.mint))}</span><span class="sp"></span><span class="mut">${r.usd != null ? kusd(r.usd) : "unknown"}</span></div>`).join("");
+}
+function wireHolderRows(root) {
+  (root || document).querySelectorAll("[data-holder]").forEach(n => {
+    n.onclick = ev => {
+      if (ev.target.closest("a,button")) return;
+      const w = n.dataset.holder;
+      if (!w) return;
+      if (holderOpen === w && !n.querySelector(".holder-more[hidden]")) { holderOpen = null; fillHolderMore(n, null); return; }
+      holderOpen = w;
+      (root || document).querySelectorAll("[data-holder]").forEach(x => { if (x !== n) fillHolderMore(x, null); });
+      if (n.dataset.pool === "1") { fillHolderMore(n, { pool: true }); return; }
+      loadHolderHoldings(w, n);
+    };
+  });
+  if (holderOpen) {
+    const n = (root || document).querySelector(`[data-holder="${CSS.escape(holderOpen)}"]`);
+    if (n) {
+      if (n.dataset.pool === "1") fillHolderMore(n, { pool: true });
+      else loadHolderHoldings(holderOpen, n);
+    }
+  }
+}
+async function loadHolderHoldings(owner, n) {
+  const cached = HOLD_CACHE[owner];
+  if (cached && (Date.now() - cached.ts) < HOLD_TTL_MS) { fillHolderMore(n, cached); return; }
+  fillHolderMore(n, { loading: true });
+  try {
+    const rows = await fetchWalletHoldings(owner);
+    HOLD_CACHE[owner] = { ts: Date.now(), rows, err: false };
+    if (holderOpen === owner) fillHolderMore(n, HOLD_CACHE[owner]);
+  } catch (e) {
+    HOLD_CACHE[owner] = { ts: Date.now(), rows: null, err: true, unknown: true };
+    if (holderOpen === owner) fillHolderMore(n, HOLD_CACHE[owner]);
+  }
+}
+async function rpcTokenAccounts(owner) {
+  const out = [];
+  let ok = false, lastErr = null;
+  for (const prog of [TOKEN_PROGRAM, TOKEN_2022]) {
+    try {
+      const r = await fetch(PUB_RPC, { method: "POST", headers: { "content-type": "application/json" }, referrerPolicy: "no-referrer",
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "getTokenAccountsByOwner", params: [owner, { programId: prog }, { encoding: "jsonParsed" }] }) });
+      if (!r.ok) { lastErr = "http " + r.status; continue; }
+      const j = await r.json();
+      if (j.error) { lastErr = (j.error.message || "rpc"); continue; }
+      ok = true;
+      for (const a of ((j.result || {}).value || [])) {
+        const info = (((a.account || {}).data || {}).parsed || {}).info || {};
+        const ta = info.tokenAmount || {}, ui = ta.uiAmount, mint = info.mint;
+        if (mint && ui && ui > 0) out.push({ mint, amount: +ui });
+      }
+    } catch (e) { lastErr = e && e.message ? e.message : "rpc"; }
+  }
+  if (!ok) throw new Error(lastErr || "rpc");
+  const by = {};
+  for (const h of out) { if (by[h.mint]) by[h.mint].amount += h.amount; else by[h.mint] = { mint: h.mint, amount: h.amount }; }
+  return Object.values(by);
+}
+async function fetchWalletHoldings(owner) {
+  const accts = await rpcTokenAccounts(owner);
+  const cur = coinSel;
+  const mints = [...new Set(accts.map(a => a.mint).filter(m => m !== cur && isMint(m)))];
+  if (!mints.length) return [];
+  const quotes = {};
+  const A = D && D.agentsx, deskCoins = (A && A.coins) || {}, deskList = (D && D.coins) || [];
+  for (const m of mints) {
+    const c = deskCoins[m] || deskList.find(x => x.mint === m);
+    if (c && (c.sym || c.name)) quotes[m] = { sym: c.sym || c.name, price: null };
+  }
+  for (let i = 0; i < mints.length; i += 30) {
+    const batch = mints.slice(i, i + 30);
+    try {
+      const r = await fetch(`https://api.dexscreener.com/tokens/v1/solana/${batch.join(",")}`, { cache: "no-store", referrerPolicy: "no-referrer" });
+      if (!r.ok) continue;
+      const pairs = await r.json();
+      const byMint = {};
+      for (const p of pairs || []) {
+        const m = (p.baseToken || {}).address;
+        if (!m || !batch.includes(m)) continue;
+        const liq = ((p.liquidity || {}).usd) || 0;
+        if (!byMint[m] || liq > byMint[m].liq) byMint[m] = { sym: (p.baseToken || {}).symbol, price: +p.priceUsd || null, liq };
+      }
+      for (const m of Object.keys(byMint)) quotes[m] = Object.assign(quotes[m] || {}, { sym: byMint[m].sym || (quotes[m] || {}).sym, price: byMint[m].price });
+    } catch (e) {}
+  }
+  const rows = accts.filter(a => a.mint !== cur).map(a => {
+    const q = quotes[a.mint] || {};
+    return { mint: a.mint, amount: a.amount, sym: q.sym || null, usd: q.price != null ? a.amount * q.price : null };
+  });
+  rows.sort((a, b) => (a.usd == null && b.usd == null) ? 0 : (a.usd == null ? 1 : b.usd == null ? -1 : b.usd - a.usd));
+  return rows.slice(0, 10);
+}
+function renderHolderRace(dock, top, A, known, labels) {
+  if (!dock) return;
+  const rows = (top || []).slice(0, 100);
+  const mint = coinSel;
+  if (holderRaceSt.mint !== mint) { holderRaceSt.mint = mint; holderRaceSt.nodes = {}; dock.innerHTML = ""; }
+  if (!dock.querySelector("#holderRaceBars")) {
+    dock.innerHTML = `<div class="card agcard" id="holderRaceCard"><div class="row"><b>🏁 Holder race</b><span class="sp"></span><span class="badge b-paper">PAPER</span></div>
+      <div class="sm mut">Live top holders (up to 100) · same race layout as the original trader race · tap a row for other coins this wallet holds</div>
+      <div id="holderRaceBars" style="position:relative;height:360px"></div>
+      <div class="sm mut" id="holderRaceFoot"></div></div>`;
+  }
+  const bars = $("holderRaceBars"), foot = $("holderRaceFoot"), nodes = holderRaceSt.nodes;
+  if (!rows.length) {
+    for (const n of Object.values(nodes)) { if (n && n.remove) n.remove(); }
+    holderRaceSt.nodes = {};
+    if (foot) foot.textContent = "";
+    if (bars) bars.innerHTML = `<p class="sm mut">Top holders: unknown or still loading.</p>`;
+    return;
+  }
+  const emptyP = bars.querySelector("p"); if (emptyP) emptyP.remove();
+  const rawSum = rows.reduce((s, h) => s + (+h.pct || 0), 0);
+  const pctMul = (rawSum > 0 && rawSum <= 1.5) ? 100 : 1;
+  const mx = Math.max(...rows.map(h => Math.abs((+h.pct || 0) * pctMul)), 0.01);
+  const keep = new Set();
+  const hBar = Math.max(rows.length * 30, 30);
+  bars.style.height = hBar + "px";
+  rows.forEach((h, i) => {
+    const w = h.owner || h.address || ("h" + i);
+    keep.add(w);
+    let n = nodes[w];
+    if (!n) {
+      n = document.createElement("div");
+      n.className = "rbar";
+      n.dataset.holder = h.owner || "";
+      n.dataset.pool = labels(h).includes("LP / pool") ? "1" : "";
+      n.innerHTML = `<span class="rb"></span><span class="rl"></span><div class="holder-more" hidden></div>`;
+      bars.appendChild(n);
+      nodes[w] = n;
+    }
+    n.classList.toggle("tap", n.dataset.pool !== "1");
+    n.style.transform = `translateY(${i * 30}px)`; n.style.opacity = 1;
+    const pctV = ((+h.pct || 0) * pctMul);
+    const b = n.querySelector(".rb"); b.style.width = Math.max(2, pctV / mx * 70) + "%";
+    b.style.background = n.dataset.pool === "1" ? "#5aa9ff" : (pctV >= 5 ? "#2fd27a" : "#5aa9ff");
+    const nm = holderKnownName(h, A, known) || shortMint(h.owner);
+    const lb = labels(h);
+    n.querySelector(".rl").innerHTML = `#${i + 1} ${esc(nm)} <b>${pctV.toFixed(2)}%</b>${lb.includes("LP / pool") ? ` <span class="src-tag">POOL</span>` : ""}`;
+  });
+  for (const [w, n] of Object.entries(nodes)) if (!keep.has(w)) { n.style.opacity = 0; n.style.transform = `translateY(${hBar}px)`; }
+  if (foot) foot.textContent = `${rows.length} holder${rows.length === 1 ? "" : "s"} · live from RugCheck`;
+  wireHolderRows(dock);
+}
+
 function renderCoin() {
   const root = $("v-coin"), A = D && D.agentsx;
   if (!$("coinBody")) {
@@ -2198,17 +2425,17 @@ function renderCoin() {
       <div class="card agcard"><b>Paste a mint</b><div class="sm mut">Any Solana coin: live chart, holders, bubble map and rug check from the same public APIs. Read-only, no buy button.</div>
       <div class="row" style="gap:.4rem;margin-top:.5rem"><input id="pasteIn" placeholder="Solana mint address" autocomplete="off" spellcheck="false" style="flex:1;min-width:0"><button class="btn" id="pasteGo">Show</button></div>
       <div class="sm mut" id="pasteMsg"></div></div>
-      <div id="coinBody"><div id="coinTop"></div><div id="coinChartDock" data-chart-dock></div><div id="coinRest"></div></div>`;
+      <div id="coinBody"><div id="coinTop"></div><div id="coinLiveWrap" class="coin-live-wrap"><div id="coinChartDock" data-chart-dock></div><div id="holderRaceDock"></div></div><div id="coinRest"></div></div>`;
     $("pasteGo").onclick = () => pasteMint($("pasteIn").value);
     $("pasteIn").onkeydown = e => { if (e.key === "Enter") pasteMint(e.target.value); };
     $("pasteIn").onpaste = e => setTimeout(() => pasteMint(e.target.value), 0);
   }
   // Ensure dock/rest exist even if an older session left a flat coinBody.
-  if (!$("coinChartDock") || !$("coinRest") || !$("coinTop")) {
-    $("coinBody").innerHTML = `<div id="coinTop"></div><div id="coinChartDock" data-chart-dock></div><div id="coinRest"></div>`;
+  if (!$("coinChartDock") || !$("coinRest") || !$("coinTop") || !$("holderRaceDock") || !$("coinLiveWrap")) {
+    $("coinBody").innerHTML = `<div id="coinTop"></div><div id="coinLiveWrap" class="coin-live-wrap"><div id="coinChartDock" data-chart-dock></div><div id="holderRaceDock"></div></div><div id="coinRest"></div>`;
   }
   if (!$("coinPageHead")) root.insertAdjacentHTML("afterbegin", `<div id="coinPageHead"></div>`);
-  $("coinPageHead").innerHTML = earlyRaceBoardHtml(true);
+  $("coinPageHead").innerHTML = earlyRaceBoardHtml(true) + coinRaceBoardHtml();
   wireEarlyRaceBoard($("coinPageHead"));
   const leftoverTabs = $("coinPageTabs"); if (leftoverTabs) leftoverTabs.remove();
   if (!A) {
@@ -2260,6 +2487,7 @@ function renderCoin() {
       if (afterH2) afterH2.insertAdjacentHTML("afterend", coinChartMeta(m));
       else el.insertAdjacentHTML("afterbegin", coinChartMeta(m));
       refreshDexInfo(m);
+      renderHolderRace($("holderRaceDock"), top, A, known, labels);
       renderHeader();
     } catch (e) {}
     return;
@@ -2285,25 +2513,15 @@ function renderCoin() {
     <div class="row" style="margin-top:.6rem;gap:.5rem;flex-wrap:wrap">${buySellFomoPair(flink)}${holdersBtns(m)}</div></div>
   <div class="card agcard"><b>PAPER entry / exit</b>
     <div class="sm mut" style="margin-top:.4rem">Desk's own price samples (not DexScreener):</div>${priceSvg(c.series, marks)}</div>
-  <div class="card agcard"><b>Top holders</b>${(() => {
-    const rawSum = top.reduce((s, h) => s + (+h.pct || 0), 0);
-    const pctMul = (rawSum > 0 && rawSum <= 1.5) ? 100 : 1;
-    const poolPct = top.reduce((s, h) => s + (labels(h).includes("LP / pool") ? ((+h.pct || 0) * pctMul) : 0), 0);
-    const poolLine = poolPct ? `<div class="sm mut" style="margin:.25rem 0 .15rem">LP / pool share (labeled AMM/pool accounts in this list): <b>${poolPct.toFixed(2)}%</b></div>` : "";
-    if (!top.length) return `<p class="sm mut">${L.rcTs ? "Top holders: unknown (RugCheck gave no list)." : "Loading from RugCheck…"}</p>`;
-    return poolLine + top.slice(0, 20).map((h, i) => {
-      const lb = labels(h);
-      const nm = holderKnownName(h, A, known);
-      const who = nm ? `<b>${esc(nm)}</b> ${walletLink(h.owner, shortMint(h.owner))}` : walletLink(h.owner);
-      return `<div class="row sm" style="margin-top:.3rem;flex-wrap:wrap;gap:.2rem"><span class="mut" style="width:1.4rem">${i + 1}</span>${who}${lb.map(x => `<span class="stage" style="margin-left:.25rem">${esc(x)}</span>`).join("")}<span class="sp"></span><b>${((+h.pct || 0) * pctMul).toFixed(2)}%</b></div>`;
-    }).join("");
-  })()}</div>
+  <div class="card agcard" id="topHoldersCard"><b>Top holders</b>${top.length ? holdersListHtml(top, A, known, labels, {limit: 100}) : `<p class="sm mut">${L.rcTs ? "Top holders: unknown (RugCheck gave no list)." : "Loading from RugCheck…"}</p>`}</div>
   <div class="card agcard"><b>Followed traders holding it</b>${fh.map(h => `<div class="row sm" style="margin-top:.3rem"><b>#${h.rank} ${esc(h.handle)}</b><span class="sp"></span>${h.pct != null ? (+h.pct).toFixed(2) + "% (top holder)" : "bought $" + (h.usd || 0).toLocaleString()}</div>`).join("") || `<p class="sm mut">None seen: no followed wallet among the top holders or in the last 72 h of followed trades.</p>`}</div>
   <div class="card agcard"><b>PAPER position</b>${ps.map(p => { const lp = p.closed ? { pnl: p.pnl } : livePnl(p);
     return `<div class="item"><div class="row"><span class="stage">${p.book === "auto" ? "auto · " + esc(p.tier) : p.book === "manual" ? "yours (logged)" : "desk"}</span><span class="sp"></span><b class="${cls(lp.pnl)}">${usd(lp.pnl, 1)}</b></div>
     <div class="sm mut">PAPER $${p.size} · entry ${px(p.entry)} · ${p.closed ? "closed " + tm(p.closed) + " · " + esc(p.reason || "") : "open since " + tm(p.opened)}</div></div>`; }).join("") || `<p class="sm mut">No PAPER position in this coin.</p>`}</div>`;
   (coinTop || el).querySelectorAll("[data-pick]").forEach(n => n.onclick = () => { coinSel = n.dataset.pick; chartHoldUntil = 0; renderCoin(); fetchHolders(coinSel); fetchLive(); });
   const back = $("coinBack"); if (back) back.onclick = () => show(coinFrom && coinFrom !== "coin" ? coinFrom : "agents");
+  renderHolderRace($("holderRaceDock"), top, A, known, labels);
+  wireHolderRows($("topHoldersCard"));
   renderHeader();
   // Chart lives in #coinChartDock ABOVE the text card — never reparented on chip switches.
   ensureDockChart(chartDock, m, chartUrl);
@@ -2416,28 +2634,40 @@ function tickUpd() {
 // ---- Race: cumulative ~6-month realized PnL per trader, month by month ----
 function renderRace() {
   const el = $("v-race"), A = D.agentsx;
-  if (!A || !A.race.frames.length) { el.innerHTML = `<div class="card mut">No race data.</div>`; return; }
+  if (!A || !A.race || !A.race.frames.length) { el.innerHTML = `<div class="card mut">No race data.</div>`; return; }
   const byW = Object.fromEntries(A.traders.map(t => [t.wallet, t]));
+  const allow = new Set((A.traders || []).filter(t => hasPlat(t.platforms, platSrc)).map(t => t.wallet));
+  const frames = A.race.frames.map(f => ({ m: f.m, top: (f.top || []).filter(v => allow.has(v.w)) }));
+  const hasAny = frames.some(f => f.top.length);
+  const raceN = Math.max(1, ...frames.map(fr => fr.top.length));
+  const who = platSrc === "all"
+    ? `${A.traders.length} wallets from the FOMO, GMGN and pump.fun top 30 boards`
+    : `${allow.size} wallet${allow.size === 1 ? "" : "s"} on ${platLabel(platSrc)}`;
   el.innerHTML = `<div class="card agcard"><div class="row"><b>🏁 Trader race · realized PnL</b><span class="sp"></span><button class="btn ghost" id="raceBtn">${raceSt.play ? "Pause" : "Play"}</button></div>
-    <div class="sm mut">${A.traders.length} wallets from the FOMO, GMGN and pump.fun top 30 boards · cumulative realized PnL per month (GMGN wallet history) · tap a bar</div>
-    <div class="row"><b id="raceM" style="font-size:2rem"></b><span class="sp"></span><input type="range" id="raceR" min="0" max="${A.race.frames.length - 1}" value="${raceSt.i}" style="width:55%"></div>
-    <div id="raceBars" style="position:relative;height:${Math.max(...A.race.frames.map(fr => (fr.top || []).length), 1) * 30}px"></div>
+    ${platChipHtml(platSrc)}
+    <div class="sm mut">${who} · cumulative realized PnL per month (GMGN wallet history) · tap a bar</div>
+    ${hasAny ? `<div class="row"><b id="raceM" style="font-size:2rem"></b><span class="sp"></span><input type="range" id="raceR" min="0" max="${A.race.frames.length - 1}" value="${raceSt.i}" style="width:55%"></div>
+    <div id="raceBars" style="position:relative;height:${raceN * 30}px"></div>` : `<p class="sm mut" style="margin-top:.5rem">No monthly PnL race data for ${esc(platLabel(platSrc))} yet.</p>`}
     <div class="sm mut">${Object.entries(PLAT_C).map(([k, c]) => `<span class="pdot" style="background:${c}"></span>${k}`).join(" · ")} · <span class="pulse"></span> live: bought in the last 15 min</div></div>`;
+  wirePlatChips(el, renderRace);
+  if (!hasAny) {
+    const btn = $("raceBtn"); if (btn) btn.onclick = () => { raceSt.play = !raceSt.play; $("raceBtn").textContent = raceSt.play ? "Pause" : "Play"; };
+    return;
+  }
   const bars = $("raceBars"), now = Date.now() / 1000, nodes = {};
   const draw = () => {
-    const f = A.race.frames[raceSt.i], mx = Math.max(...f.top.map(v => Math.abs(v.v)), 1);
+    const f = frames[raceSt.i] || frames[0], mx = Math.max(...(f.top.length ? f.top.map(v => Math.abs(v.v)) : [1]), 1);
     $("raceM").textContent = f.m; $("raceR").value = raceSt.i;
     const keep = new Set();
-    (f.top || []).forEach((v, i) => {
-      const t = byW[v.w] || { handle: v.w.slice(0, 4), platforms: [] }; keep.add(v.w);
+    f.top.forEach((v, i) => {
+      const t = byW[v.w] || { handle: (v.w || "").slice(0, 4), platforms: [] }; keep.add(v.w);
       let n = nodes[v.w];
       if (!n) { n = document.createElement("div"); n.className = "rbar tap"; n.dataset.trader = v.w; n.innerHTML = `<span class="rb"></span><span class="rl"></span>`; bars.appendChild(n); nodes[v.w] = n;
         n.onclick = () => { agSel = { t: "trader", id: v.w, from: "race" }; show("agents"); }; }
       n.style.transform = `translateY(${i * 30}px)`; n.style.opacity = 1;
       const b = n.querySelector(".rb"); b.style.width = Math.max(2, Math.abs(v.v) / mx * 70) + "%"; b.style.background = v.v < 0 ? "#ff5468" : PLAT_C[t.platforms[0]] || "#888";
-      n.querySelector(".rl").innerHTML = `${platDots(t.platforms)}${esc(t.handle)} <b>${kusd(v.v)}</b>${t.last_buy && now - t.last_buy < 900 ? `<span class="pulse"></span>` : ""}`;
+      n.querySelector(".rl").innerHTML = `${platDots(t.platforms)}${srcTags(t.platforms)}${esc(t.handle)} <b>${kusd(v.v)}</b>${t.last_buy && now - t.last_buy < 900 ? `<span class="pulse"></span>` : ""}`;
     });
-    const raceN = Math.max(...A.race.frames.map(fr => (fr.top || []).length), 1);
     for (const [w, n] of Object.entries(nodes)) if (!keep.has(w)) { n.style.opacity = 0; n.style.transform = `translateY(${raceN * 30}px)`; }
   };
   draw();
@@ -2499,7 +2729,7 @@ let swReg = null, pushCode = localStorage.getItem("desk_push_code");
 async function registerSW() {
   if (!("serviceWorker" in navigator)) return null;
   try {
-    swReg = await navigator.serviceWorker.register("sw.js?v=37", { scope: "./" });
+    swReg = await navigator.serviceWorker.register("sw.js?v=38", { scope: "./" });
     if (swReg && swReg.update) swReg.update().catch(() => {});
     // New SW takes control → reload once so the PWA drops a blank half-cached shell.
     let refreshing = false;
