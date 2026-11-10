@@ -7,7 +7,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' https: data:; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' https://api.dexscreener.com https://api.rugcheck.xyz https://api.geckoterminal.com; frame-src https://dexscreener.com https://www.dexscreener.com; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="theme-color" content="#07090c">
 <title>Desk</title>
-<!-- desk-build:26 agent-anim-charts -->
+<!-- desk-build:27 agent-anim-pin-lock -->
 <script>
 // set the theme before first paint; Dark / Dim / Light (legacy auto/light migrated once)
 (function () { try {
@@ -240,6 +240,10 @@ html[data-theme="light"] .rl{text-shadow:none;color:#0b1220}
 #pinGate .pin-err{color:var(--red);font-size:.85rem;min-height:1.2em;margin:0 0 .6rem}
 #pinGate .pin-forgot{background:none;border:0;color:var(--mut);text-decoration:underline;font-size:.85rem;cursor:pointer;padding:.4rem}
 #pinGate .pin-note{color:var(--mut);font-size:.72rem;margin-top:1.2rem;line-height:1.35}
+
+#pinGate .pin-pad.pin-locked button:not([data-k="forgot"]){opacity:.45;pointer-events:none}
+#pinGate .pin-err.pin-countdown,#pinGate .pin-err{font-variant-numeric:tabular-nums}
+
 #lock{display:none;text-align:center;padding:4rem 1rem}
 .split-trades{display:none}
 @media (min-width:960px){
@@ -2370,7 +2374,7 @@ let swReg = null, pushCode = localStorage.getItem("desk_push_code");
 async function registerSW() {
   if (!("serviceWorker" in navigator)) return null;
   try {
-    swReg = await navigator.serviceWorker.register("sw.js?v=26", { scope: "./" });
+    swReg = await navigator.serviceWorker.register("sw.js?v=27", { scope: "./" });
     if (swReg && swReg.update) swReg.update().catch(() => {});
     // New SW takes control → reload once so the PWA drops a blank half-cached shell.
     let refreshing = false;
@@ -2451,12 +2455,12 @@ async function refresh() {
 // Stores only a salted PBKDF2-SHA256 hash in localStorage. Never sent to the desk, Telegram, or logs.
 const PIN_KEY = "desk_pin_v1";
 const PIN_USED_KEY = "desk_pin_reset_used";
-const PIN_TRIES_KEY = "desk_pin_tries";
+const PIN_TRIES_KEY = "desk_pin_tries"; // { lockUntil: ms } — wrong PIN never wipes PIN or token
 const PIN_LEN = 6;
 const PIN_ITER = 210000;
-const PIN_MAX_TRIES = 5;
-const PIN_LOCK_MS = 5 * 60 * 1000;
+const PIN_LOCK_MS = 60 * 1000; // 60s keypad lock after each wrong PIN (survives app reopen)
 let pinBuf = "", pinMode = "unlock", pinFirst = null; // set | confirm | unlock | reset_code
+let pinCountdownTimer = null;
 
 function pinRecord() {
   try { return JSON.parse(localStorage.getItem(PIN_KEY) || "null"); } catch (e) { return null; }
@@ -2467,6 +2471,8 @@ function pinTriesState() {
 }
 function pinSetTries(st) { try { localStorage.setItem(PIN_TRIES_KEY, JSON.stringify(st)); } catch (e) {} }
 function pinClearLocal(full) {
+  // Only called after a successful Telegram reset (full=false) or explicit fallback clear (full=true).
+  // Wrong PIN / lockout must NEVER call this — never wipe PIN or token on a bad try.
   try { localStorage.removeItem(PIN_KEY); } catch (e) {}
   try { localStorage.removeItem(PIN_TRIES_KEY); } catch (e) {}
   if (full) {
@@ -2569,6 +2575,9 @@ function pinShow(mode) {
     $("pinSub").textContent = "Privacy lock on this phone only. The desk never sees your PIN.";
     $("pinForgot").style.display = ""; if (fb) fb.style.display = "none";
   }
+  // Resume 60s lockout countdown after close/reopen (lockUntil in localStorage)
+  if (pinLockedOut()) { /* countdown running; keypad locked */ }
+  else pinPadSetLocked(false);
 }
 function pinHide() { $("pinGate").classList.remove("on"); document.body.classList.remove("pin-on"); }
 function startApp() {
@@ -2581,26 +2590,57 @@ function startApp() {
   registerSW(); show(view); refresh();
   setInterval(refresh, 30000); setInterval(() => D && renderHeader(), 30000);
 }
+function pinPadSetLocked(on) {
+  const pad = $("pinPad");
+  if (!pad) return;
+  pad.classList.toggle("pin-locked", !!on);
+  pad.querySelectorAll("button").forEach(b => {
+    if (b.dataset.k === "forgot") return; // Forgot / Telegram reset still available
+    b.disabled = !!on;
+  });
+}
+function pinStopCountdown() {
+  if (pinCountdownTimer) { clearInterval(pinCountdownTimer); pinCountdownTimer = null; }
+}
+function pinPaintCountdown() {
+  const st = pinTriesState();
+  const left = st.lockUntil ? st.lockUntil - Date.now() : 0;
+  if (left <= 0) {
+    pinStopCountdown();
+    pinSetTries({ lockUntil: 0 });
+    pinPadSetLocked(false);
+    if ($("pinErr") && /^Try again in /.test($("pinErr").textContent || "")) $("pinErr").textContent = "";
+    return false;
+  }
+  const sec = Math.max(1, Math.ceil(left / 1000));
+  if ($("pinErr")) $("pinErr").textContent = `Try again in ${sec}s`;
+  pinPadSetLocked(true);
+  return true;
+}
+function pinStartCountdown() {
+  pinStopCountdown();
+  pinPaintCountdown();
+  pinCountdownTimer = setInterval(pinPaintCountdown, 250);
+}
 function pinLockedOut() {
   const st = pinTriesState();
   if (st.lockUntil && Date.now() < st.lockUntil) {
-    const sec = Math.ceil((st.lockUntil - Date.now()) / 1000);
-    $("pinErr").textContent = `Too many tries — wait ${sec}s`;
+    pinStartCountdown();
     return true;
   }
-  if (st.lockUntil && Date.now() >= st.lockUntil) pinSetTries({ n: 0, lockUntil: 0 });
+  if (st.lockUntil && Date.now() >= st.lockUntil) {
+    pinSetTries({ lockUntil: 0 });
+    pinPadSetLocked(false);
+  }
   return false;
 }
 function pinFailTry() {
-  const st = pinTriesState();
-  st.n = (st.n || 0) + 1;
-  if (st.n >= PIN_MAX_TRIES) { st.lockUntil = Date.now() + PIN_LOCK_MS; st.n = 0; }
-  pinSetTries(st);
-  if (st.lockUntil && Date.now() < st.lockUntil) {
-    $("pinErr").textContent = `Too many tries — wait ${Math.ceil((st.lockUntil - Date.now()) / 1000)}s`;
-  } else {
-    $("pinErr").textContent = `Wrong code (${PIN_MAX_TRIES - st.n} left)`;
-  }
+  // Each wrong PIN locks the keypad for 60s. Never clears PIN_KEY or desk_app_token.
+  const until = Date.now() + PIN_LOCK_MS;
+  pinSetTries({ lockUntil: until });
+  pinBuf = "";
+  pinPaintDots();
+  pinStartCountdown();
 }
 async function pinVerifyTelegramCode(code) {
   // Refresh encrypted feed (token already on device). Challenge lives in D.pin_reset.
@@ -2627,7 +2667,7 @@ async function pinSubmit() {
       pinFirst = null; pinShow("set"); return;
     }
     try { await pinSave(pin); } catch (e) { $("pinErr").textContent = "Could not save PIN."; pinShow("set"); return; }
-    pinFirst = null; pinSetTries({ n: 0, lockUntil: 0 }); startApp(); return;
+    pinFirst = null; pinStopCountdown(); pinSetTries({ lockUntil: 0 }); pinPadSetLocked(false); startApp(); return;
   }
   if (pinMode === "reset_code") {
     $("pinErr").textContent = "Checking…";
@@ -2645,8 +2685,8 @@ async function pinSubmit() {
   // unlock
   let ok = false;
   try { ok = await pinCheck(pin); } catch (e) { ok = false; }
-  if (ok) { pinSetTries({ n: 0, lockUntil: 0 }); startApp(); }
-  else { pinFailTry(); if (!$("pinErr").textContent.startsWith("Too many")) $("pinErr").textContent = "Wrong PIN."; }
+  if (ok) { pinStopCountdown(); pinSetTries({ lockUntil: 0 }); pinPadSetLocked(false); startApp(); }
+  else { pinFailTry(); } // shows "Try again in 60s" — never wipes PIN or token
 }
 function pinForgot() {
   // Telegram one-time code path (keeps token). Fallback button clears token.
