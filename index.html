@@ -7,7 +7,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' https: data:; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' https://api.dexscreener.com https://api.rugcheck.xyz https://api.geckoterminal.com; frame-src https://dexscreener.com https://www.dexscreener.com; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="theme-color" content="#07090c">
 <title>Desk</title>
-<!-- desk-build:24 pin-lock-section-links -->
+<!-- desk-build:25 slim-taskbar-pin-menu -->
 <script>
 // set the theme before first paint; Dark / Dim / Light (legacy auto/light migrated once)
 (function () { try {
@@ -31,7 +31,7 @@
 :root{--bg:#07090c;--card:#11151b;--card2:#171c24;--line:#232a35;--txt:#e9edf2;--mut:#8a94a3;--grn:#2fd27a;--red:#ff5468;--amb:#ffb648;--blu:#5aa9ff}
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.4 -apple-system,system-ui,Segoe UI,Roboto,sans-serif;-webkit-tap-highlight-color:transparent}
-body{padding-bottom:calc(68px + env(safe-area-inset-bottom))}
+body{padding-bottom:calc(56px + env(safe-area-inset-bottom))}
 header{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:.35rem;padding:.55rem .65rem;background:rgba(7,9,12,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);flex-wrap:nowrap}
 header h1{margin:0;font-size:1rem;letter-spacing:.05em;flex:none}
 header .upd{margin-left:auto;color:var(--mut);font-size:.68rem;text-align:right;line-height:1.15;flex:none;max-width:4.6rem}
@@ -145,10 +145,32 @@ ul.plain{list-style:none;margin:0;padding:0}ul.plain li{padding:.45rem 0;border-
 .st-held,.st-approved,.st-cleared,.st-candidate{background:#123524;color:var(--grn)}.st-rejected,.st-reject{background:#3a121a;color:var(--red)}.st-wait,.st-scored{background:#2a2410;color:var(--amb)}
 .item{padding:.75rem 0;border-bottom:1px solid var(--line)}.item:last-child{border:0}
 .lg{width:34px;height:34px;font-size:.75rem}
-nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:6;display:flex;background:rgba(10,13,17,.97);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
-nav.tabs button{flex:1;min-width:0;background:none;border:0;color:var(--mut);padding:.55rem 0 .6rem;font-size:.72rem;display:flex;flex-direction:column;align-items:center;gap:2px}
-nav.tabs button svg{width:22px;height:22px}
-nav.tabs button.on{color:var(--txt)}
+/* Slim centred taskbar (Windows-style) — one bar, not a second nav */
+nav.tabs{
+  position:fixed;left:50%;bottom:calc(8px + env(safe-area-inset-bottom));
+  transform:translateX(-50%);z-index:6;
+  display:flex;align-items:center;justify-content:center;gap:2px;
+  width:max-content;max-width:calc(100vw - 24px);
+  padding:4px 8px;border-radius:16px;
+  background:rgba(18,22,28,.92);border:1px solid var(--line);
+  box-shadow:0 6px 24px rgba(0,0,0,.35);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+}
+nav.tabs button,nav.tabs a.tab-link{
+  flex:none;min-width:40px;height:40px;padding:0 8px;margin:0;
+  background:transparent;border:0;border-radius:12px;color:var(--mut);
+  font-size:.58rem;font-weight:600;letter-spacing:.01em;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
+  text-decoration:none;cursor:pointer;-webkit-tap-highlight-color:transparent;
+}
+nav.tabs button svg,nav.tabs a.tab-link svg{width:16px;height:16px;display:block}
+nav.tabs button.on,nav.tabs a.tab-link.on{color:var(--txt);background:rgba(255,255,255,.08)}
+html[data-theme="dim"] nav.tabs,html[data-theme="light"] nav.tabs{
+  background:rgba(255,255,255,.94);box-shadow:0 6px 20px rgba(15,23,42,.12);
+}
+html[data-theme="dim"] nav.tabs button.on,html[data-theme="light"] nav.tabs button.on,
+html[data-theme="dim"] nav.tabs a.tab-link.on,html[data-theme="light"] nav.tabs a.tab-link.on{
+  background:rgba(15,23,42,.06);color:var(--txt);
+}
 
 /* Dim = former Light (soft grey). Light = true white page. Dark = default :root. */
 html[data-theme="dim"]{--bg:#f4f6f9;--card:#ffffff;--card2:#eef1f5;--line:#dde3ea;--txt:#11161d;--mut:#5d6775;--grn:#0e9f56;--red:#d42c43;--amb:#a86a0c;--blu:#1f6fd1}
@@ -221,17 +243,16 @@ html[data-theme="light"] .rl{text-shadow:none;color:#0b1220}
 #lock{display:none;text-align:center;padding:4rem 1rem}
 .split-trades{display:none}
 @media (min-width:960px){
-  body{padding-bottom:0}
-  nav.tabs{position:sticky;top:53px;bottom:auto;justify-content:center;border-top:0;border-bottom:1px solid var(--line);background:var(--bg)}
-  nav.tabs button{flex:none;width:120px;flex-direction:row;justify-content:center;gap:.4rem;font-size:.85rem;padding:.7rem 0}
-  nav.tabs button svg{width:18px;height:18px}
+  body{padding-bottom:calc(56px + env(safe-area-inset-bottom))}
+  nav.tabs{position:fixed;left:50%;bottom:12px;transform:translateX(-50%);top:auto;border:1px solid var(--line)}
+  nav.tabs button,nav.tabs a.tab-link{min-width:48px;height:42px;font-size:.62rem;padding:0 10px}
+  nav.tabs button svg,nav.tabs a.tab-link svg{width:17px;height:17px}
   .split{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:1rem;align-items:start}
   .split-trades{display:block}
   #v-home .homegrid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;align-items:start}
 }
 
 /* Agents + Race + Coin: dark paper panels only in Dark theme; Dim/Light inherit page theme */
-@media(max-width:480px){nav.tabs button{font-size:.55rem;padding:.5rem 0 .55rem}nav.tabs button svg{width:19px;height:19px}}
 html[data-theme="dark"] #v-agents,html[data-theme="dark"] #v-race,html[data-theme="dark"] #v-coin,
 html:not([data-theme]) #v-agents,html:not([data-theme]) #v-race,html:not([data-theme]) #v-coin{
   --bg:#000;--card:#0d1014;--card2:#151a21;--line:#1f262f;--txt:#eef2f6;--mut:#8792a2;--grn:#2fd27a;--red:#ff5468;--amb:#ffb648;color:var(--txt);background:#000;margin:-1rem -1rem 0;padding:1rem;min-height:100vh}
@@ -287,16 +308,13 @@ html[data-theme="light"] #v-agents,html[data-theme="light"] #v-race,html[data-th
   <div class="upd" id="upd">Loading…</div>
   <button id="theme" title="Theme: cycles Dark → Dim → Light">Auto</button>
 </header>
-<nav class="tabs" id="tabs">
-  <button data-v="agents"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="7" width="16" height="12" rx="3"/><path d="M12 3v4M9 12h.01M15 12h.01M9 16h6"/></svg>Agents</button>
-  <button data-v="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Home</button>
-  <button data-v="audit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg>Auditor</button>
-  <button data-v="coins"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="9" r="6"/><path d="M15.5 9.5a6 6 0 1 1-6 6"/></svg>Coins</button>
-  <button data-v="trades"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>Trades</button>
-  <button data-v="whales"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 13c0 4 4 6 9 6s9-3 9-8c0-2-1-3-2-3-2 0-2 3-5 3S9 8 6 8c-2 0-3 2-3 5z"/><path d="M19 8c0-2 1-3 2-4"/></svg>Whales</button>
-  <button data-v="coin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 18l5-6 4 3 7-9"/><circle cx="20" cy="6" r="1.5"/></svg>Coin</button>
-  <button data-v="race"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V4M8 8h10M8 12h6M8 16h12"/></svg>Race</button>
-  <button data-v="events"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5"/><path d="M9 17a3 3 0 0 0 6 0"/></svg>Alerts</button>
+<nav class="tabs" id="tabs" aria-label="Desk taskbar">
+  <button type="button" data-v="home" title="Home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Home</button>
+  <button type="button" data-v="events" title="Alerts"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5"/><path d="M9 17a3 3 0 0 0 6 0"/></svg>Alerts</button>
+  <button type="button" data-v="coin" title="Coin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 18l5-6 4 3 7-9"/><circle cx="20" cy="6" r="1.5"/></svg>Coin</button>
+  <button type="button" data-v="whales" title="Whales"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 13c0 4 4 6 9 6s9-3 9-8c0-2-1-3-2-3-2 0-2 3-5 3S9 8 6 8c-2 0-3 2-3 5z"/><path d="M19 8c0-2 1-3 2-4"/></svg>Whales</button>
+  <button type="button" data-v="events" data-logbook="1" title="Logbook"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 4h11a2 2 0 0 1 2 2v14l-3-2-3 2-3-2-3 2V6a2 2 0 0 1 2-2z"/><path d="M9 8h6M9 12h6"/></svg>Logbook</button>
+  <a class="tab-link" id="tabTelegram" href="https://t.me/Alltradein_bot" target="_blank" rel="noopener noreferrer" title="Telegram bot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 5L2 12.5l6 2 2 6 3.5-4L18 18l3-13z"/><path d="M8.5 14.5L18 8"/></svg>Telegram</a>
 </nav>
 <div id="lock"><h2>Locked</h2><p class="mut" id="lockmsg">Open your secret desk link (the one ending in #t=…) once on this device.</p></div>
 <div id="pinGate" aria-live="polite">
@@ -2097,7 +2115,13 @@ function show(v) {
   if (D) renderHeader();
   window.scrollTo(0, 0);
 }
-document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => show(b.dataset.v));
+document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => {
+  show(b.dataset.v);
+  if (b.dataset.logbook) {
+    // Alerts tab = logbook/search surface
+    setTimeout(() => { const s = $("alSearch"); if (s) { s.focus(); try { s.scrollIntoView({ block: "nearest" }); } catch (e) {} } }, 50);
+  }
+});
 const _bell = $("hdrBell"); if (_bell) _bell.onclick = () => show("events");
 const _wbtn = $("hdrWallet"); if (_wbtn) _wbtn.onclick = () => cycleWallet();
 document.addEventListener("click", e => { const g = e.target.closest("[data-go]"); if (g) show(g.dataset.go); });
@@ -2126,7 +2150,7 @@ let swReg = null, pushCode = localStorage.getItem("desk_push_code");
 async function registerSW() {
   if (!("serviceWorker" in navigator)) return null;
   try {
-    swReg = await navigator.serviceWorker.register("sw.js?v=24", { scope: "./" });
+    swReg = await navigator.serviceWorker.register("sw.js?v=25", { scope: "./" });
     if (swReg && swReg.update) swReg.update().catch(() => {});
     // New SW takes control → reload once so the PWA drops a blank half-cached shell.
     let refreshing = false;
