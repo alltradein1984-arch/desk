@@ -8,7 +8,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' https: data:; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' https://api.dexscreener.com https://api.rugcheck.xyz https://api.geckoterminal.com https://api.mainnet-beta.solana.com; frame-src https://dexscreener.com https://www.dexscreener.com; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="theme-color" content="#07090c">
 <title>Desk</title>
-<!-- desk-build:38 coin-race -->
+<!-- desk-build:39 coin-race -->
 <script>
 // set the theme before first paint; Dark / Dim / Light (legacy auto/light migrated once)
 (function () { try {
@@ -283,7 +283,10 @@ html[data-theme="light"] #v-agents,html[data-theme="light"] #v-race,html[data-th
 .src-tag{font-size:.62rem;font-weight:700;margin-right:.28rem;padding:.04rem .28rem;border-radius:4px;border:1px solid var(--line);color:var(--mut);vertical-align:middle;white-space:nowrap}
 .coin-live-wrap{display:grid;grid-template-columns:1fr;gap:.65rem;margin:.5rem 0}
 @media(min-width:720px){.coin-live-wrap{grid-template-columns:1.15fr .85fr;align-items:start}}
-#holderRaceBars{overflow:auto;max-height:360px}
+#holderRaceBars{overflow:auto;max-height:360px;height:auto!important}
+#holderRaceBars .rbar{position:relative;left:auto;right:auto;height:auto;min-height:26px;transform:none!important;margin:0 0 4px;overflow:hidden}
+#holderRaceBars .holder-more{margin-top:26px;position:relative;z-index:1;background:var(--card);padding:.1rem 0 .35rem;border-radius:6px}
+
 .agcard{background:var(--card);border-color:var(--line)}
 .agbig{font-size:2rem;font-weight:800;letter-spacing:-.02em;margin:.2rem 0}
 .agsplit{display:grid;grid-template-columns:1fr;gap:0}@media(min-width:720px){.agsplit{grid-template-columns:1fr 1fr;gap:.9rem}}
@@ -2262,17 +2265,29 @@ function holdersListHtml(top, A, known, labels, opts) {
     </div>`;
   }).join("");
 }
+function layoutHolderRace() {
+  const bars = $("holderRaceBars");
+  if (!bars) return;
+  // Rows in this list are position:relative so an open "other coins" panel
+  // pushes later rows down (the trader-race absolute stack would overlap).
+  bars.querySelectorAll(".rbar").forEach(n => { n.style.transform = "none"; });
+  bars.style.height = "auto";
+}
 function fillHolderMore(n, data) {
   const box = n && n.querySelector(".holder-more");
   if (!box) return;
-  if (!data) { box.hidden = true; box.innerHTML = ""; return; }
-  box.hidden = false;
-  if (data.pool) { box.innerHTML = `<div class="sm mut" style="margin:.25rem 0 .15rem 1.4rem"><span class="stage">POOL</span> AMM / pool wallet — holdings not fetched.</div>`; return; }
-  if (data.loading) { box.innerHTML = `<div class="sm mut" style="margin:.25rem 0 .15rem 1.4rem">Loading holdings…</div>`; return; }
-  if (data.err || data.unknown) { box.innerHTML = `<div class="sm mut" style="margin:.25rem 0 .15rem 1.4rem">Other coins: unknown</div>`; return; }
-  if (!data.rows || !data.rows.length) { box.innerHTML = `<div class="sm mut" style="margin:.25rem 0 .15rem 1.4rem">No other coins found.</div>`; return; }
-  box.innerHTML = `<div class="sm mut" style="margin:.25rem 0 .15rem 1.4rem">Other coins (read-only, top ${data.rows.length} by USD where known):</div>` +
-    data.rows.map(r => `<div class="row sm" style="margin-left:1.4rem;margin-top:.15rem"><span>${esc(r.sym || shortMint(r.mint))}</span><span class="sp"></span><span class="mut">${r.usd != null ? kusd(r.usd) : "unknown"}</span></div>`).join("");
+  try {
+    if (!data) { box.hidden = true; box.innerHTML = ""; return; }
+    box.hidden = false;
+    if (data.pool) { box.innerHTML = `<div class="sm mut" style="margin:.25rem 0 .15rem 1.4rem"><span class="stage">POOL</span> AMM / pool wallet — holdings not fetched.</div>`; return; }
+    if (data.loading) { box.innerHTML = `<div class="sm mut" style="margin:.25rem 0 .15rem 1.4rem">Loading holdings…</div>`; return; }
+    if (data.err || data.unknown) { box.innerHTML = `<div class="sm mut" style="margin:.25rem 0 .15rem 1.4rem">Other coins: unknown</div>`; return; }
+    if (!data.rows || !data.rows.length) { box.innerHTML = `<div class="sm mut" style="margin:.25rem 0 .15rem 1.4rem">No other coins found.</div>`; return; }
+    box.innerHTML = `<div class="sm mut" style="margin:.25rem 0 .15rem 1.4rem">Other coins (read-only, top ${data.rows.length} by USD where known):</div>` +
+      data.rows.map(r => `<div class="row sm" style="margin-left:1.4rem;margin-top:.15rem"><span>${esc(r.sym || shortMint(r.mint))}</span><span class="sp"></span><span class="mut">${r.usd != null ? kusd(r.usd) : "unknown"}</span></div>`).join("");
+  } finally {
+    if (n && n.closest("#holderRaceBars")) requestAnimationFrame(() => layoutHolderRace());
+  }
 }
 function wireHolderRows(root) {
   (root || document).querySelectorAll("[data-holder]").forEach(n => {
@@ -2389,8 +2404,7 @@ function renderHolderRace(dock, top, A, known, labels) {
   const pctMul = (rawSum > 0 && rawSum <= 1.5) ? 100 : 1;
   const mx = Math.max(...rows.map(h => Math.abs((+h.pct || 0) * pctMul)), 0.01);
   const keep = new Set();
-  const hBar = Math.max(rows.length * 30, 30);
-  bars.style.height = hBar + "px";
+  bars.style.height = "auto";
   rows.forEach((h, i) => {
     const w = h.owner || h.address || ("h" + i);
     keep.add(w);
@@ -2405,7 +2419,8 @@ function renderHolderRace(dock, top, A, known, labels) {
       nodes[w] = n;
     }
     n.classList.toggle("tap", n.dataset.pool !== "1");
-    n.style.transform = `translateY(${i * 30}px)`; n.style.opacity = 1;
+    n.dataset.i = String(i);
+    n.style.opacity = 1;
     const pctV = ((+h.pct || 0) * pctMul);
     const b = n.querySelector(".rb"); b.style.width = Math.max(2, pctV / mx * 70) + "%";
     b.style.background = n.dataset.pool === "1" ? "#5aa9ff" : (pctV >= 5 ? "#2fd27a" : "#5aa9ff");
@@ -2413,8 +2428,9 @@ function renderHolderRace(dock, top, A, known, labels) {
     const lb = labels(h);
     n.querySelector(".rl").innerHTML = `#${i + 1} ${esc(nm)} <b>${pctV.toFixed(2)}%</b>${lb.includes("LP / pool") ? ` <span class="src-tag">POOL</span>` : ""}`;
   });
-  for (const [w, n] of Object.entries(nodes)) if (!keep.has(w)) { n.style.opacity = 0; n.style.transform = `translateY(${hBar}px)`; }
+  for (const [w, n] of Object.entries(nodes)) if (!keep.has(w)) { n.style.opacity = 0; }
   if (foot) foot.textContent = `${rows.length} holder${rows.length === 1 ? "" : "s"} · live from RugCheck`;
+  layoutHolderRace();
   wireHolderRows(dock);
 }
 
@@ -2666,7 +2682,7 @@ function renderRace() {
         n.onclick = () => { agSel = { t: "trader", id: v.w, from: "race" }; show("agents"); }; }
       n.style.transform = `translateY(${i * 30}px)`; n.style.opacity = 1;
       const b = n.querySelector(".rb"); b.style.width = Math.max(2, Math.abs(v.v) / mx * 70) + "%"; b.style.background = v.v < 0 ? "#ff5468" : PLAT_C[t.platforms[0]] || "#888";
-      n.querySelector(".rl").innerHTML = `${platDots(t.platforms)}${srcTags(t.platforms)}${esc(t.handle)} <b>${kusd(v.v)}</b>${t.last_buy && now - t.last_buy < 900 ? `<span class="pulse"></span>` : ""}`;
+      n.querySelector(".rl").innerHTML = `<span class="whale-rank">#${i + 1}</span> ${platDots(t.platforms)}${srcTags(t.platforms)}${esc(t.handle)} <b>${kusd(v.v)}</b>${t.last_buy && now - t.last_buy < 900 ? `<span class="pulse"></span>` : ""}`;
     });
     for (const [w, n] of Object.entries(nodes)) if (!keep.has(w)) { n.style.opacity = 0; n.style.transform = `translateY(${raceN * 30}px)`; }
   };
@@ -2729,7 +2745,7 @@ let swReg = null, pushCode = localStorage.getItem("desk_push_code");
 async function registerSW() {
   if (!("serviceWorker" in navigator)) return null;
   try {
-    swReg = await navigator.serviceWorker.register("sw.js?v=38", { scope: "./" });
+    swReg = await navigator.serviceWorker.register("sw.js?v=39", { scope: "./" });
     if (swReg && swReg.update) swReg.update().catch(() => {});
     // New SW takes control → reload once so the PWA drops a blank half-cached shell.
     let refreshing = false;
