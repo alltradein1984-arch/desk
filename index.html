@@ -7,7 +7,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' https: data:; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' https://api.dexscreener.com https://api.rugcheck.xyz https://api.geckoterminal.com; frame-src https://dexscreener.com https://www.dexscreener.com; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="theme-color" content="#07090c">
 <title>Desk</title>
-<!-- desk-build:23 alert-n-logbook-home-agents -->
+<!-- desk-build:24 pin-lock-section-links -->
 <script>
 // set the theme before first paint; Dark / Dim / Light (legacy auto/light migrated once)
 (function () { try {
@@ -203,6 +203,21 @@ html[data-theme="light"] #v-agents,html[data-theme="light"] #v-race,html[data-th
 html[data-theme="dim"] #v-agents,html[data-theme="dim"] #v-race,html[data-theme="dim"] #v-coin{background:#f4f6f9;color:#11161d;--bg:#f4f6f9;--card:#ffffff;--card2:#eef1f5;--line:#dde3ea;--txt:#11161d;--mut:#5d6775;--grn:#0e9f56;--red:#d42c43;--amb:#a86a0c}
 html[data-theme="light"] .rl{text-shadow:none;color:#0b1220}
 #theme{background:var(--card2);color:var(--txt);border:1px solid var(--line);border-radius:99px;font-size:.72rem;padding:.2rem .6rem;cursor:pointer}
+
+/* PIN privacy lock (local only; salted hash in localStorage; never sent to the desk) */
+#pinGate{display:none;text-align:center;padding:3.5rem 1.25rem 2rem;max-width:360px;margin:0 auto}
+#pinGate.on{display:block}
+#pinGate h2{margin:0 0 .35rem;font-size:1.35rem}
+#pinGate .pin-sub{color:var(--mut);font-size:.9rem;margin:0 0 1.1rem;line-height:1.35}
+#pinGate .pin-dots{display:flex;justify-content:center;gap:.55rem;margin:0 0 1rem}
+#pinGate .pin-dots i{width:12px;height:12px;border-radius:50%;border:2px solid var(--line);background:transparent;display:inline-block}
+#pinGate .pin-dots i.on{background:var(--txt);border-color:var(--txt)}
+#pinGate .pin-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:.55rem;max-width:260px;margin:0 auto 1rem}
+#pinGate .pin-pad button{appearance:none;border:1px solid var(--line);background:var(--card2);color:var(--txt);border-radius:14px;font-size:1.25rem;font-weight:700;padding:.85rem 0;cursor:pointer}
+#pinGate .pin-pad button:active{opacity:.75}
+#pinGate .pin-err{color:var(--red);font-size:.85rem;min-height:1.2em;margin:0 0 .6rem}
+#pinGate .pin-forgot{background:none;border:0;color:var(--mut);text-decoration:underline;font-size:.85rem;cursor:pointer;padding:.4rem}
+#pinGate .pin-note{color:var(--mut);font-size:.72rem;margin-top:1.2rem;line-height:1.35}
 #lock{display:none;text-align:center;padding:4rem 1rem}
 .split-trades{display:none}
 @media (min-width:960px){
@@ -284,6 +299,23 @@ html[data-theme="light"] #v-agents,html[data-theme="light"] #v-race,html[data-th
   <button data-v="events"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5"/><path d="M9 17a3 3 0 0 0 6 0"/></svg>Alerts</button>
 </nav>
 <div id="lock"><h2>Locked</h2><p class="mut" id="lockmsg">Open your secret desk link (the one ending in #t=…) once on this device.</p></div>
+<div id="pinGate" aria-live="polite">
+  <h2 id="pinTitle">Enter PIN</h2>
+  <p class="pin-sub" id="pinSub">Privacy lock on this phone only. The desk never sees your PIN.</p>
+  <div class="pin-dots" id="pinDots" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  <p class="pin-err" id="pinErr"></p>
+  <div class="pin-pad" id="pinPad">
+    <button type="button" data-k="1">1</button><button type="button" data-k="2">2</button><button type="button" data-k="3">3</button>
+    <button type="button" data-k="4">4</button><button type="button" data-k="5">5</button><button type="button" data-k="6">6</button>
+    <button type="button" data-k="7">7</button><button type="button" data-k="8">8</button><button type="button" data-k="9">9</button>
+    <button type="button" data-k="forgot" class="pin-forgot-key" style="font-size:.7rem;font-weight:600">Forgot</button>
+    <button type="button" data-k="0">0</button>
+    <button type="button" data-k="del" aria-label="Delete">⌫</button>
+  </div>
+  <button type="button" class="pin-forgot" id="pinForgot">Forgot PIN — use Telegram code</button>
+  <button type="button" class="pin-forgot" id="pinFallback" style="display:none">Fallback: clear PIN + token (need #t= link)</button>
+  <p class="pin-note">PIN stays on this device as a salted hash. Not a server password. Reset uses a one-time code from your desk Telegram bot (salted hash in the encrypted feed). Fallback clears the local token and needs your private #t= link.</p>
+</div>
 <div id="chartPark" aria-hidden="true"></div>
 <main id="app">
   <section class="view" id="v-agents"></section>
@@ -876,7 +908,15 @@ function agentEvents(id) {
   return (D.events || []).filter(e => resolveAgentId(e.agent) === idL);
 }
 
-let D = null, view = localStorage.getItem("desk_view") || "home", aIdx = 0;
+const DESK_VIEWS = new Set(["home","audit","coins","trades","whales","events","agents","race","coin"]);
+function viewFromQuery() {
+  try {
+    const v = new URLSearchParams(location.search).get("v");
+    return (v && DESK_VIEWS.has(v)) ? v : null;
+  } catch (e) { return null; }
+}
+let D = null, view = viewFromQuery() || localStorage.getItem("desk_view") || "home", aIdx = 0;
+if (DESK_VIEWS.has(view)) try { localStorage.setItem("desk_view", view); } catch (e) {}
 
 // ---------- screens ----------
 const agoShort = ts => { const m = Math.max(0, (Date.now() / 1000 - ts) / 60);
@@ -2086,7 +2126,7 @@ let swReg = null, pushCode = localStorage.getItem("desk_push_code");
 async function registerSW() {
   if (!("serviceWorker" in navigator)) return null;
   try {
-    swReg = await navigator.serviceWorker.register("sw.js?v=23", { scope: "./" });
+    swReg = await navigator.serviceWorker.register("sw.js?v=24", { scope: "./" });
     if (swReg && swReg.update) swReg.update().catch(() => {});
     // New SW takes control → reload once so the PWA drops a blank half-cached shell.
     let refreshing = false;
@@ -2162,8 +2202,198 @@ async function refresh() {
   }
 }
 
-if (!deskToken()) { $("lock").style.display = "block"; $("app").style.display = "none"; $("tabs").style.display = "none"; $("upd").textContent = ""; }
-else { registerSW(); show(view); refresh(); setInterval(refresh, 30000); setInterval(() => D && renderHeader(), 30000); }
+
+// ---------- PIN privacy lock (local only) ----------
+// Stores only a salted PBKDF2-SHA256 hash in localStorage. Never sent to the desk, Telegram, or logs.
+const PIN_KEY = "desk_pin_v1";
+const PIN_USED_KEY = "desk_pin_reset_used";
+const PIN_TRIES_KEY = "desk_pin_tries";
+const PIN_LEN = 6;
+const PIN_ITER = 210000;
+const PIN_MAX_TRIES = 5;
+const PIN_LOCK_MS = 5 * 60 * 1000;
+let pinBuf = "", pinMode = "unlock", pinFirst = null; // set | confirm | unlock | reset_code
+
+function pinRecord() {
+  try { return JSON.parse(localStorage.getItem(PIN_KEY) || "null"); } catch (e) { return null; }
+}
+function pinTriesState() {
+  try { return JSON.parse(localStorage.getItem(PIN_TRIES_KEY) || "null") || { n: 0, lockUntil: 0 }; }
+  catch (e) { return { n: 0, lockUntil: 0 }; }
+}
+function pinSetTries(st) { try { localStorage.setItem(PIN_TRIES_KEY, JSON.stringify(st)); } catch (e) {} }
+function pinClearLocal(full) {
+  try { localStorage.removeItem(PIN_KEY); } catch (e) {}
+  try { localStorage.removeItem(PIN_TRIES_KEY); } catch (e) {}
+  if (full) {
+    try { localStorage.removeItem("desk_app_token"); } catch (e) {}
+    try { localStorage.removeItem(PIN_USED_KEY); } catch (e) {}
+  }
+}
+async function pinDerive(pin, saltB64, iter) {
+  const salt = b64d(saltB64);
+  const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(pin), "PBKDF2", false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt, iterations: iter || PIN_ITER }, base, 256);
+  return btoa(String.fromCharCode(...new Uint8Array(bits)));
+}
+async function pinSave(pin) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const saltB64 = btoa(String.fromCharCode(...salt));
+  const hash = await pinDerive(pin, saltB64, PIN_ITER);
+  localStorage.setItem(PIN_KEY, JSON.stringify({ v: 1, iter: PIN_ITER, salt: saltB64, hash }));
+}
+async function pinCheck(pin) {
+  const rec = pinRecord();
+  if (!rec || !rec.salt || !rec.hash) return false;
+  const got = await pinDerive(pin, rec.salt, rec.iter || PIN_ITER);
+  return got === rec.hash;
+}
+function pinPaintDots() {
+  const dots = document.querySelectorAll("#pinDots i");
+  dots.forEach((d, i) => d.classList.toggle("on", i < pinBuf.length));
+}
+function pinShow(mode) {
+  pinMode = mode; pinBuf = ""; pinPaintDots();
+  $("pinErr").textContent = "";
+  $("pinGate").classList.add("on");
+  $("lock").style.display = "none";
+  $("app").style.display = "none";
+  $("tabs").style.display = "none";
+  $("upd").textContent = "";
+  const fb = $("pinFallback");
+  if (mode === "set") {
+    $("pinTitle").textContent = "Set a 6-digit PIN";
+    $("pinSub").textContent = "Choose a PIN for this phone. Enter it twice. It never leaves this device.";
+    $("pinForgot").style.display = "none"; if (fb) fb.style.display = "none";
+  } else if (mode === "confirm") {
+    $("pinTitle").textContent = "Confirm PIN";
+    $("pinSub").textContent = "Enter the same 6 digits again.";
+    $("pinForgot").style.display = "none"; if (fb) fb.style.display = "none";
+  } else if (mode === "reset_code") {
+    $("pinTitle").textContent = "Enter Telegram code";
+    $("pinSub").textContent = "Ask the desk bot for 🔁 Reset PIN, then type the 6-digit code here. Valid ~10 minutes.";
+    $("pinForgot").style.display = "none"; if (fb) fb.style.display = "";
+  } else {
+    $("pinTitle").textContent = "Enter PIN";
+    $("pinSub").textContent = "Privacy lock on this phone only. The desk never sees your PIN.";
+    $("pinForgot").style.display = ""; if (fb) fb.style.display = "none";
+  }
+}
+function pinHide() { $("pinGate").classList.remove("on"); }
+function startApp() {
+  pinHide();
+  $("lock").style.display = "none";
+  $("app").style.display = "";
+  $("tabs").style.display = "";
+  registerSW(); show(view); refresh();
+  setInterval(refresh, 30000); setInterval(() => D && renderHeader(), 30000);
+}
+function pinLockedOut() {
+  const st = pinTriesState();
+  if (st.lockUntil && Date.now() < st.lockUntil) {
+    const sec = Math.ceil((st.lockUntil - Date.now()) / 1000);
+    $("pinErr").textContent = `Too many tries — wait ${sec}s`;
+    return true;
+  }
+  if (st.lockUntil && Date.now() >= st.lockUntil) pinSetTries({ n: 0, lockUntil: 0 });
+  return false;
+}
+function pinFailTry() {
+  const st = pinTriesState();
+  st.n = (st.n || 0) + 1;
+  if (st.n >= PIN_MAX_TRIES) { st.lockUntil = Date.now() + PIN_LOCK_MS; st.n = 0; }
+  pinSetTries(st);
+  if (st.lockUntil && Date.now() < st.lockUntil) {
+    $("pinErr").textContent = `Too many tries — wait ${Math.ceil((st.lockUntil - Date.now()) / 1000)}s`;
+  } else {
+    $("pinErr").textContent = `Wrong code (${PIN_MAX_TRIES - st.n} left)`;
+  }
+}
+async function pinVerifyTelegramCode(code) {
+  // Refresh encrypted feed (token already on device). Challenge lives in D.pin_reset.
+  let feed = D;
+  try { feed = await load("desk"); D = feed; } catch (e) { /* use cached D if any */ }
+  const pr = feed && feed.pin_reset;
+  if (!pr || !pr.hash || !pr.salt || !pr.id) return { ok: false, why: "No active reset code in the feed. Tap 🔁 Reset PIN in Telegram first." };
+  if (pr.exp && pr.exp * 1000 < Date.now()) return { ok: false, why: "Code expired. Tap 🔁 Reset PIN in Telegram for a new one." };
+  let used = null; try { used = localStorage.getItem(PIN_USED_KEY); } catch (e) {}
+  if (used && used === pr.id) return { ok: false, why: "This code was already used on this phone." };
+  const got = await pinDerive(code, pr.salt, pr.iter || PIN_ITER);
+  if (got !== pr.hash) return { ok: false, why: "bad" };
+  try { localStorage.setItem(PIN_USED_KEY, pr.id); } catch (e) {}
+  return { ok: true };
+}
+async function pinSubmit() {
+  if (pinLockedOut()) { pinBuf = ""; pinPaintDots(); return; }
+  const pin = pinBuf;
+  pinBuf = ""; pinPaintDots();
+  if (pinMode === "set") { pinFirst = pin; pinShow("confirm"); return; }
+  if (pinMode === "confirm") {
+    if (pin !== pinFirst) {
+      $("pinErr").textContent = "PINs did not match. Try again.";
+      pinFirst = null; pinShow("set"); return;
+    }
+    try { await pinSave(pin); } catch (e) { $("pinErr").textContent = "Could not save PIN."; pinShow("set"); return; }
+    pinFirst = null; pinSetTries({ n: 0, lockUntil: 0 }); startApp(); return;
+  }
+  if (pinMode === "reset_code") {
+    $("pinErr").textContent = "Checking…";
+    const r = await pinVerifyTelegramCode(pin);
+    if (!r.ok) {
+      if (r.why === "bad") pinFailTry();
+      else $("pinErr").textContent = r.why;
+      return;
+    }
+    pinClearLocal(false); // keep desk token; clear PIN hash only
+    pinShow("set");
+    $("pinErr").textContent = "Code OK — set a new PIN.";
+    return;
+  }
+  // unlock
+  let ok = false;
+  try { ok = await pinCheck(pin); } catch (e) { ok = false; }
+  if (ok) { pinSetTries({ n: 0, lockUntil: 0 }); startApp(); }
+  else { pinFailTry(); if (!$("pinErr").textContent.startsWith("Too many")) $("pinErr").textContent = "Wrong PIN."; }
+}
+function pinForgot() {
+  // Telegram one-time code path (keeps token). Fallback button clears token.
+  pinShow("reset_code");
+}
+function pinFallbackClear() {
+  if (!confirm("Clear the PIN and the saved desk token on this phone? You will need your private #t= link again.")) return;
+  pinClearLocal(true);
+  pinHide();
+  $("lock").style.display = "block";
+  $("app").style.display = "none";
+  $("tabs").style.display = "none";
+  $("upd").textContent = "";
+  $("lockmsg").textContent = "PIN and token cleared. Open your secret desk link (the one ending in #t=…) once on this device.";
+}
+(function bindPin() {
+  const pad = $("pinPad");
+  if (!pad) return;
+  pad.addEventListener("click", e => {
+    const b = e.target.closest("button[data-k]"); if (!b) return;
+    const k = b.dataset.k;
+    if (k === "forgot") return pinForgot();
+    if (k === "del") { pinBuf = pinBuf.slice(0, -1); pinPaintDots(); $("pinErr").textContent = ""; return; }
+    if (!/^\d$/.test(k) || pinBuf.length >= PIN_LEN) return;
+    if (pinLockedOut()) return;
+    pinBuf += k; pinPaintDots(); $("pinErr").textContent = "";
+    if (pinBuf.length === PIN_LEN) pinSubmit();
+  });
+  const fg = $("pinForgot"); if (fg) fg.onclick = pinForgot;
+  const fb = $("pinFallback"); if (fb) fb.onclick = pinFallbackClear;
+})();
+
+if (!deskToken()) {
+  $("lock").style.display = "block"; $("app").style.display = "none"; $("tabs").style.display = "none"; $("upd").textContent = "";
+} else if (!pinRecord()) {
+  pinShow("set");
+} else {
+  pinShow("unlock");
+}
+
 </script>
 </body>
 </html>
