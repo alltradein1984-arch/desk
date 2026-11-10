@@ -8,7 +8,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' https: data:; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' https://api.dexscreener.com https://api.rugcheck.xyz https://api.geckoterminal.com; frame-src https://dexscreener.com https://www.dexscreener.com; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="theme-color" content="#07090c">
 <title>Desk</title>
-<!-- desk-build:35 agent-anim-chrome -->
+<!-- desk-build:36 early-rank -->
 <script>
 // set the theme before first paint; Dark / Dim / Light (legacy auto/light migrated once)
 (function () { try {
@@ -1007,6 +1007,7 @@ const AGENT_BLURB = {
   webpush: "Sends phone Web Push notifications."
 };
 let homeAgentSel = null;
+let coinPageTab = "coin";
 /** Scrub long base58 addresses / #t= / referral crumbs from agent log lines. */
 function scrubSafe(s) {
   if (s == null) return "";
@@ -2139,9 +2140,50 @@ function coinList(A) {
   return pasted.map(m => [m, null]).concat([...new Map(A.open.concat(A.closed).map(p => [p.mint, p.sym])).entries()].concat(A.alerts.filter(a => isMint(a.mint)).map(a => [a.mint, null])))
     .filter((x, i, arr) => arr.findIndex(y => y[0] === x[0]) === i).slice(0, 14);
 }
+
+function coinPageTabsHtml() {
+  return `<div class="card" id="coinPageTabs" style="margin-bottom:.65rem"><div class="al-chips" style="margin:0">
+    <button type="button" class="al-chip${coinPageTab === "coin" ? " on" : ""}" id="coinTabCoin">Coin</button>
+    <button type="button" class="al-chip${coinPageTab === "early" ? " on" : ""}" id="coinTabEarly">Early rank</button>
+  </div></div>`;
+}
+function wireCoinPageTabs() {
+  const a = $("coinTabCoin"), b = $("coinTabEarly");
+  if (a) a.onclick = () => { coinPageTab = "coin"; renderCoin(); };
+  if (b) b.onclick = () => { coinPageTab = "early"; renderCoin(); };
+}
+function earlyRankHtml() {
+  const rows = (D && D.early_rank) || [];
+  const note = `<p class="sm mut">Ranking is the desk's score, not advice. PAPER only.</p>`;
+  if (!rows.length) {
+    return `<div class="card"><b>Early rank</b>${note}<p class="sm mut">No early-buy candidates yet. Only coins the desk flagged as early buys appear here.</p></div>`;
+  }
+  const li = rows.map((c, i) => {
+    const age = c.spotted ? ago(c.spotted) : "n/a";
+    const sc = c.score != null ? Math.round(c.score) : "n/a";
+    const chk = (lab, v) => `${lab} ${v === "pass" ? "pass" : v === "fail" ? "fail" : "n/a"}`;
+    const mc0 = c.mcap_spot != null ? kusd(c.mcap_spot) : "n/a";
+    const mc1 = c.mcap_now != null ? kusd(c.mcap_now) : "n/a";
+    const chg = c.chg_pct != null ? pct(c.chg_pct) : "n/a";
+    return `<div class="item"><div class="row"><b><span class="whale-rank">#${i + 1}</span> ${esc(c.sym || shortMint(c.mint))}</b>
+      <span class="sp"></span><span class="score ${c.score != null && c.score >= 70 ? "hi" : "lo"}">${sc}</span></div>
+      <div class="sm mut">spotted ${esc(age)} · ${chk("auditor", c.audit)} · ${chk("rug", c.rug)}</div>
+      <div class="sm mut">MC at spot ${mc0} · now ${mc1} · change ${chg}</div>
+      <div class="row" style="margin-top:.35rem;gap:.35rem;flex-wrap:wrap"><span class="sp"></span>${chartBtn(c.chart_url)}${holdersBtns(c.mint, true)}</div></div>`;
+  }).join("");
+  return `<div class="card"><b>Early rank</b>${note}
+    <p class="sm mut">Top ${rows.length} early-buy flags, ranked by the desk's combined score (newest first on a tie). Older or unflagged coins are left out.</p>
+    ${li}</div>`;
+}
+
 function renderCoin() {
   const root = $("v-coin"), A = D && D.agentsx;
-  if (!A) { root.innerHTML = `<div class="card mut">Coin data not in this feed yet.</div>`; return; }
+  if (coinPageTab === "early") {
+    root.innerHTML = coinPageTabsHtml() + earlyRankHtml();
+    wireCoinPageTabs();
+    return;
+  }
+  if (!A) { root.innerHTML = coinPageTabsHtml() + `<div class="card mut">Coin data not in this feed yet.</div>`; wireCoinPageTabs(); return; }
   if (!$("coinBody")) {
     root.innerHTML = `<div class="card agcard"><b>Paste a mint</b><div class="sm mut">Any Solana coin: live chart, holders, bubble map and rug check from the same public APIs. Read-only, no buy button.</div>
       <div class="row" style="gap:.4rem;margin-top:.5rem"><input id="pasteIn" placeholder="Solana mint address" autocomplete="off" spellcheck="false" style="flex:1;min-width:0"><button class="btn" id="pasteGo">Show</button></div>
@@ -2155,6 +2197,9 @@ function renderCoin() {
   if (!$("coinChartDock") || !$("coinRest") || !$("coinTop")) {
     $("coinBody").innerHTML = `<div id="coinTop"></div><div id="coinChartDock" data-chart-dock></div><div id="coinRest"></div>`;
   }
+  if (!$("coinPageTabs")) root.insertAdjacentHTML("afterbegin", coinPageTabsHtml());
+  else $("coinPageTabs").outerHTML = coinPageTabsHtml();
+  wireCoinPageTabs();
   const el = $("coinRest");
   const chartDock = $("coinChartDock");
   const coinTop = $("coinTop");
@@ -2427,7 +2472,7 @@ let swReg = null, pushCode = localStorage.getItem("desk_push_code");
 async function registerSW() {
   if (!("serviceWorker" in navigator)) return null;
   try {
-    swReg = await navigator.serviceWorker.register("sw.js?v=35", { scope: "./" });
+    swReg = await navigator.serviceWorker.register("sw.js?v=36", { scope: "./" });
     if (swReg && swReg.update) swReg.update().catch(() => {});
     // New SW takes control → reload once so the PWA drops a blank half-cached shell.
     let refreshing = false;
